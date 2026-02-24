@@ -68,13 +68,18 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         if fit.shape != (4,):
             raise ValueError(f"fitness_fn should return proper shape, got {fit.shape}")
 
-        # TODO: When a child and a parent are tied but child index prevails is that considered an improvement or not? Consider the case where p1 has the highest fitness and c1 / p2 have the 2nd highest
         order = np.lexsort((-is_child, -fit))
         winners_idx = order[:2]
         winners = family[winners_idx]
 
-        if 2 in winners_idx or 3 in winners_idx:
-            improvement = True
+        # if not improvement:
+        #     if 2 in winners_idx or 3 in winners_idx:
+        #         improvement = True
+
+        if not improvement:
+            parents_max = fit[:2].max()  # indices 0,1
+            children_max = fit[2:].max()  # indices 2,3
+            improvement = children_max > parents_max
 
         if debug_ties:
             # Rule to pick children in case of a tie
@@ -110,7 +115,7 @@ Output
     - True / False flag to indicate if optimum found (found -> True, 20 failures -> False)
     - total generations
 """
-def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX") -> Tuple[np.ndarray, bool, int]:
+def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX", max_failures = 20) -> Tuple[np.ndarray, bool, int]:
     # Step 1: initiate random population of size N, length l
     rng = np.random.default_rng()
     P_old = rng.integers(0, 2, size=(N, l), dtype=np.int8)
@@ -118,7 +123,7 @@ def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossov
     total_generations = 0
 
     # Step 2: run 'ga_iteration' iteratively to generate new populations
-    while consecutive_failures < 20:
+    while consecutive_failures < max_failures:
         P_new, improve_flag = ga_iteration(P_old, fitness_fn, crossover)
         P_old = P_new
         total_generations += 1
@@ -166,4 +171,4 @@ if __name__ == "__main__":
     print("Mean fitness P1 (2X):", fitness_counting_ones(P1_2x).mean())
     print("Tie test passed (children selected on equal fitness).")
 
-    final_population, optimum_found, total_generations = run_ga(N=10, l=40, fitness_fn=fitness_counting_ones, crossover="UX")
+    final_population, optimum_found, total_generations = run_ga(N=10, l=40, fitness_fn=fitness_counting_ones, crossover="UX", max_failures=5)
