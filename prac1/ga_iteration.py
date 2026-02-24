@@ -176,6 +176,31 @@ def fitness_helper_B(x: np.ndarray, d: float) -> np.ndarray:
         (k - d) - ((k - d) / (k - 1)) * co
     )
 
+def trap_function_tightly_linked(x: np.ndarray, k: int, d:float) -> np.ndarray:
+    N, l = x.shape
+    m = l // k
+
+    x_split = x.reshape(N,m, k)
+    B_x = np.zeros([N, m])
+    for i in range(m):
+        B_x[:, i] = fitness_helper_B(x_split[:, i], d)
+
+    tf = B_x.sum(axis = 1)
+    return tf
+
+
+def trap_function_non_tightly_linked(x: np.ndarray, k: int, d: float) -> np.ndarray:
+    N, l = x.shape
+    m = l // k
+
+    B_x = np.zeros([N, m])
+    for i in range(m):
+        B_x[:, i] = fitness_helper_B(x[:, i::m], d)
+
+    tf = B_x.sum(axis=1)
+    return tf
+
+
 if __name__ == "__main__":
     # Testing
     rng = np.random.default_rng(42)
@@ -202,5 +227,8 @@ if __name__ == "__main__":
     b1 = fitness_helper_B(np.array([[1,0,1,1],[1,0,0,1],[1,1,1,1]]), d=1)
     b2 = fitness_helper_B(np.array([[1,0,1,1],[0,0,0,1],[0,0,0,0]]), d=2.5)
 
+
     print()
+
+    trap_function_non_tightly_linked(P0, k=4, d=1)
 
