@@ -1,12 +1,15 @@
 from typing import Callable, Literal, Optional, Tuple
 import numpy as np
+from functools import partial
 
 # import Crossover functions
 from helper_functions import CrossoverType, uniform_crossover, two_point_crossover
 # Import Fitnes functions
 from helper_functions import fitness_counting_ones, fitness_helper_B, trap_function_tightly_linked, trap_function_non_tightly_linked
 
-def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> Tuple[np.ndarray, bool]:
+FitnessFn = Callable[[np.ndarray], np.ndarray]
+
+def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> Tuple[np.ndarray, bool]:
     improvement = False
 
     if rng is None:
@@ -38,7 +41,9 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         c1, c2 = recombination(p1, p2, rng)
 
         family = np.stack([p1, p2, c1, c2], axis=0)
+
         fit = np.asarray(fitness_fn(family))
+
         if fit.shape != (4,):
             raise ValueError(f"fitness_fn should return proper shape, got {fit.shape}")
 
@@ -51,9 +56,9 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         #         improvement = True
 
         if not improvement:
-            parents_max = fit[:2].max()  # indices 0,1
+            parents_min = fit[:2].min()  # indices 0,1
             children_max = fit[2:].max()  # indices 2,3
-            improvement = children_max > parents_max
+            improvement = children_max > parents_min
 
         if debug_ties:
             # Rule to pick children in case of a tie
@@ -73,6 +78,7 @@ This is the function that runs the genetic algorithm until it either converges o
 Inputs
     - N: population size
     - l: solution length 
+    - k: sub-function length (for non-
     - fitness_fn: fitness function to be used
     - crossover: crossover type
 
@@ -89,7 +95,7 @@ Output
     - True / False flag to indicate if optimum found (found -> True, 20 failures -> False)
     - total generations
 """
-def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX", max_failures = 20) -> Tuple[np.ndarray, bool, int]:
+def run_ga(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", max_failures = 20) -> Tuple[np.ndarray, bool, int]:
     # Step 1: initiate random population of size N, length l
     rng = np.random.default_rng()
     P_old = rng.integers(0, 2, size=(N, l), dtype=np.int8)
@@ -98,7 +104,7 @@ def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossov
 
     # Step 2: run 'ga_iteration' iteratively to generate new populations
     while consecutive_failures < max_failures:
-        P_new, improve_flag = ga_iteration(P_old, fitness_fn, crossover)
+        P_new, improve_flag = ga_iteration(P_old, fitness_fn, crossover=crossover, rng=rng)
         P_old = P_new
         total_generations += 1
 
@@ -123,32 +129,31 @@ def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossov
 
 if __name__ == "__main__":
     # Testing
-    rng = np.random.default_rng(42)
-    N, L = 10, 40
-    P0 = rng.integers(0, 2, size=(N, L), dtype=np.int8)
-    rng_test = np.random.default_rng(123)
-
-    p = rng_test.integers(0, 2, size=(1, 40), dtype=np.int8)
-    P_tie = np.repeat(p, repeats=10, axis=0)
-    P1_ux, imp1_ux = ga_iteration(P0, fitness_counting_ones, crossover="UX", rng=rng)
-    P1_2x, imp2_ux = ga_iteration(P0, fitness_counting_ones, crossover="2X", rng=rng)
-    P_next, imp_next = ga_iteration(P_tie, fitness_counting_ones, crossover="UX", rng=rng_test, debug_ties=True)
-
-    print("P0 shape:", P0.shape)
-    print("P1 (UX) shape:", P1_ux.shape, "unique values:", np.unique(P1_ux))
-    print("P1 (2X) shape:", P1_2x.shape, "unique values:", np.unique(P1_2x))
-    print("Mean fitness P0:", fitness_counting_ones(P0).mean())
-    print("Mean fitness P1 (UX):", fitness_counting_ones(P1_ux).mean())
-    print("Mean fitness P1 (2X):", fitness_counting_ones(P1_2x).mean())
-    print("Tie test passed (children selected on equal fitness).")
-
-    final_population, optimum_found, total_generations = run_ga(N=10, l=40, fitness_fn=fitness_counting_ones, crossover="UX", max_failures=5)
-
-    b1 = fitness_helper_B(np.array([[1,0,1,1],[1,0,0,1],[1,1,1,1]]), d=1)
-    b2 = fitness_helper_B(np.array([[1,0,1,1],[0,0,0,1],[0,0,0,0]]), d=2.5)
-
-
+    # rng = np.random.default_rng(42)
+    # N, L = 10, 40
+    # P0 = rng.integers(0, 2, size=(N, L), dtype=np.int8)
+    # rng_test = np.random.default_rng(123)
+    #
+    # p = rng_test.integers(0, 2, size=(1, 40), dtype=np.int8)
+    # P_tie = np.repeat(p, repeats=10, axis=0)
+    # P1_ux, imp1_ux = ga_iteration(P0, fitness_counting_ones, crossover="UX", rng=rng)
+    # P1_2x, imp2_ux = ga_iteration(P0, fitness_counting_ones, crossover="2X", rng=rng)
+    # P_next, imp_next = ga_iteration(P_tie, fitness_counting_ones, crossover="UX", rng=rng_test, debug_ties=True)
+    #
+    # print("P0 shape:", P0.shape)
+    # print("P1 (UX) shape:", P1_ux.shape, "unique values:", np.unique(P1_ux))
+    # print("P1 (2X) shape:", P1_2x.shape, "unique values:", np.unique(P1_2x))
+    # print("Mean fitness P0:", fitness_counting_ones(P0).mean())
+    # print("Mean fitness P1 (UX):", fitness_counting_ones(P1_ux).mean())
+    # print("Mean fitness P1 (2X):", fitness_counting_ones(P1_2x).mean())
+    # print("Tie test passed (children selected on equal fitness).")
+    #
+    # k = 4
+    # d = 2.5
+    #
+    # fitness_tight = partial(trap_function_tightly_linked, k=k, d=d)
+    # fitness_nontight = partial(trap_function_non_tightly_linked, k=k, d=d)
+    #
+    # final_population, ok, gens = run_ga(N=10, l=12, fitness_fn=fitness_nontight, crossover="UX")
     print()
-
-    trap_function_non_tightly_linked(P0, k=4, d=1)
 
