@@ -68,6 +68,7 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         if fit.shape != (4,):
             raise ValueError(f"fitness_fn should return proper shape, got {fit.shape}")
 
+        # TODO: When a child and a parent are tied but child index prevails is that considered an improvement or not? Consider the case where p1 has the highest fitness and c1 / p2 have the 2nd highest
         order = np.lexsort((-is_child, -fit))
         winners_idx = order[:2]
         winners = family[winners_idx]
@@ -85,6 +86,60 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         out += 2
 
     return P_next, improvement
+
+
+"""
+This is the function that runs the genetic algorithm until it either converges or fails.
+
+Inputs
+    - N: population size
+    - l: solution length 
+    - fitness_fn: fitness function to be used
+    - crossover: crossover type
+
+Steps
+    1. initialises a random population of size N, where each individual is a binary vector of length l
+    2. runs ga_iteration repeatedly to generate the next population P(t+1)
+    3. stops if:
+        - '111..11' is part of P(t+1), or
+        - there has been no improvement for 20 consecutive generations (based on the "improve_flag" from ga_iteration)
+    4. returns the final population and a true/false flag to indicate success/failure
+
+Output
+    - final population
+    - True / False flag to indicate if optimum found (found -> True, 20 failures -> False)
+    - total generations
+"""
+def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX") -> Tuple[np.ndarray, bool, int]:
+    # Step 1: initiate random population of size N, length l
+    rng = np.random.default_rng()
+    P_old = rng.integers(0, 2, size=(N, l), dtype=np.int8)
+    consecutive_failures = 0
+    total_generations = 0
+
+    # Step 2: run 'ga_iteration' iteratively to generate new populations
+    while consecutive_failures < 20:
+        P_new, improve_flag = ga_iteration(P_old, fitness_fn, crossover)
+        P_old = P_new
+        total_generations += 1
+
+        global_optimum_found = np.any(np.all(P_new == 1, axis=1))
+
+        # Step 3: Check for global optimum in new population, or if no improvement has been made for the past 20 generations
+        if global_optimum_found:
+            print(f"global optimum found: True, total generations: {total_generations}")
+            return P_new, True, total_generations
+        else:
+            if not improve_flag:
+                consecutive_failures += 1
+            else:
+                consecutive_failures = 0
+        print(f"global optimum found: False, total generations: {total_generations}, consecutive failures: {consecutive_failures}")
+
+    return P_new, False, total_generations
+
+
+
 
 # Fitness function - to be implemented
 def fitness_counting_ones(pop: np.ndarray) -> np.ndarray:
@@ -110,3 +165,5 @@ if __name__ == "__main__":
     print("Mean fitness P1 (UX):", fitness_counting_ones(P1_ux).mean())
     print("Mean fitness P1 (2X):", fitness_counting_ones(P1_2x).mean())
     print("Tie test passed (children selected on equal fitness).")
+
+    final_population, optimum_found, total_generations = run_ga(N=10, l=40, fitness_fn=fitness_counting_ones, crossover="UX")
