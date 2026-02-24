@@ -150,6 +150,32 @@ def run_ga(N:int, l:int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossov
 def fitness_counting_ones(pop: np.ndarray) -> np.ndarray:
     return pop.sum(axis=1).astype(float)
 
+"""
+B(x1,x2,...,xk): returns either k or the fitness value based on the formula (k - d) - ((k - d) / (k - 1)) * co depending on co (count of ones)
+This is used as a helper function in the trap functions
+
+Inputs
+    - x: Nxk array
+    - d: predefined value, based on which the function will either be deceptive or non-deceptive
+Steps
+    1. count the number of '1' on each row
+    2. perform the formula on each row
+Output
+    - N-long array of the B values of all rows of x
+"""
+def fitness_helper_B(x: np.ndarray, d: float) -> np.ndarray:
+    k = x.shape[1]
+    # Step 1: count the number of ones on each row
+    co = fitness_counting_ones(x) # or fitness_counting_ones(x)
+
+    # Step 2:
+    #   where CO(x) = k ->  B = k, where CO(x) < k -> apply formula
+    return np.where(
+        co == k,
+        float(k),
+        (k - d) - ((k - d) / (k - 1)) * co
+    )
+
 if __name__ == "__main__":
     # Testing
     rng = np.random.default_rng(42)
@@ -172,3 +198,9 @@ if __name__ == "__main__":
     print("Tie test passed (children selected on equal fitness).")
 
     final_population, optimum_found, total_generations = run_ga(N=10, l=40, fitness_fn=fitness_counting_ones, crossover="UX", max_failures=5)
+
+    b1 = fitness_helper_B(np.array([[1,0,1,1],[1,0,0,1],[1,1,1,1]]), d=1)
+    b2 = fitness_helper_B(np.array([[1,0,1,1],[0,0,0,1],[0,0,0,0]]), d=2.5)
+
+    print()
+
