@@ -32,7 +32,9 @@ def two_point_crossover(p1: np.ndarray, p2: np.ndarray, rng: np.random.Generator
     c2[a:b] = p1[a:b]
     return c1, c2
 
-def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> np.ndarray:
+def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> Tuple[np.ndarray, bool]:
+    improvement = False
+
     if rng is None:
         rng = np.random.default_rng()
 
@@ -70,6 +72,9 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         winners_idx = order[:2]
         winners = family[winners_idx]
 
+        if 2 in winners_idx or 3 in winners_idx:
+            improvement = True
+
         if debug_ties:
             # Rule to pick children in case of a tie
             if np.all(fit == fit[0]):
@@ -79,7 +84,7 @@ def ga_iteration(P: np.ndarray, fitness_fn: Callable[[np.ndarray], np.ndarray], 
         P_next[out + 1] = winners[1]
         out += 2
 
-    return P_next
+    return P_next, improvement
 
 # Fitness function - to be implemented
 def fitness_counting_ones(pop: np.ndarray) -> np.ndarray:
@@ -94,9 +99,9 @@ if __name__ == "__main__":
 
     p = rng_test.integers(0, 2, size=(1, 40), dtype=np.int8)
     P_tie = np.repeat(p, repeats=10, axis=0)
-    P1_ux = ga_iteration(P0, fitness_counting_ones, crossover="UX", rng=rng)
-    P1_2x = ga_iteration(P0, fitness_counting_ones, crossover="2X", rng=rng)
-    P_next = ga_iteration(P_tie, fitness_counting_ones, crossover="UX", rng=rng_test, debug_ties=True)
+    P1_ux, imp1_ux = ga_iteration(P0, fitness_counting_ones, crossover="UX", rng=rng)
+    P1_2x, imp2_ux = ga_iteration(P0, fitness_counting_ones, crossover="2X", rng=rng)
+    P_next, imp_next = ga_iteration(P_tie, fitness_counting_ones, crossover="UX", rng=rng_test, debug_ties=True)
 
     print("P0 shape:", P0.shape)
     print("P1 (UX) shape:", P1_ux.shape, "unique values:", np.unique(P1_ux))
