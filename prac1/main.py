@@ -20,6 +20,7 @@ import time
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from typing import Callable, List, Tuple
+import statistics
 
 import numpy as np
 
@@ -31,19 +32,20 @@ from helper_functions import CrossoverType, fitness_counting_ones, trap_function
 class TrialSummary:
     N: int
     success_count: int
-    generations_success: List[int]
-    wall_time_s: float
+    generations_success: List[int]  # List of the total generations it took for each successful trial
+    evaluations_list : List[int]     # List of total fitness evaluations in the run
+    trial_times: List[float]    # List of the time it took to run each successful trial
 
     @property
     def solved(self) -> bool:
         return self.success_count >= 9
 
 
-def run_ga_silent(N: int, l: int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType) -> Tuple[bool, int]:
+def run_ga_silent(N: int, l: int, fitness_fn: Callable[[np.ndarray], np.ndarray], crossover: CrossoverType) -> Tuple[bool, int, int, float]:
     buf = io.StringIO()
     with redirect_stdout(buf):
-        _, ok, gens = run_ga(N=N, l=l, fitness_fn=fitness_fn, crossover=crossover, max_failures=20)
-    return bool(ok), int(gens)
+        _, ok, gens, fit_evals, total_time = run_ga(N=N, l=l, fitness_fn=fitness_fn, crossover=crossover, max_failures=20)
+    return bool(ok), int(gens), int(fit_evals), float(total_time)
 
 
 def run_10_trials(
@@ -52,18 +54,20 @@ def run_10_trials(
     fitness_fn: Callable[[np.ndarray], np.ndarray],
     crossover: CrossoverType,
 ) -> TrialSummary:
-    t0 = time.perf_counter()
     success_count = 0
     generations_success: List[int] = []
+    evaluations: List[int] = []
+    trial_times: List[float] = []
 
     for _ in range(10):
-        ok, gens = run_ga_silent(N, l, fitness_fn, crossover)
+        ok, gens, fit_evals, total_time = run_ga_silent(N, l, fitness_fn, crossover)
         if ok:
             success_count += 1
             generations_success.append(gens)
+            evaluations.append(fit_evals)
+            trial_times.append(total_time)
 
-    t1 = time.perf_counter()
-    return TrialSummary(N=N, success_count=success_count, generations_success=generations_success, wall_time_s=(t1 - t0))
+    return TrialSummary(N=N, success_count=success_count, generations_success=generations_success, evaluations_list=evaluations, trial_times=trial_times)
 
 
 def as_multiple_of_10(x: int) -> int:
@@ -132,7 +136,7 @@ def print_results(results: List[TrialSummary]) -> None:
     for r in results:
         gens_list = ", ".join(str(g) for g in r.generations_success)
         print(f"N={r.N:4d}  success={r.success_count}/10  solved={r.solved}  "
-              f"time={r.wall_time_s:.3f}s  gens(successes)=[{gens_list}]")
+              f"average time={statistics.mean(r.trial_times):.3f}s  gens(successes)=[{gens_list}]")
 
 
 def main() -> None:
@@ -149,7 +153,7 @@ def main() -> None:
     ]
 
     for name, fitness_fn in fitness_function:
-        final_population, ok, gens = run_ga(
+        final_population, ok, gens, evals, total_time = run_ga(
             N=N,
             l=l,
             fitness_fn=fitness_fn,

@@ -1,6 +1,7 @@
 from typing import Callable, Literal, Optional, Tuple
 import numpy as np
 from functools import partial
+import time
 
 # import Crossover functions
 from helper_functions import CrossoverType, uniform_crossover, two_point_crossover
@@ -99,13 +100,14 @@ Output
     - True / False flag to indicate if optimum found (found -> True, 20 failures -> False)
     - total generations
 """
-def run_ga(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", max_failures = 20) -> Tuple[np.ndarray, bool, int]:
+def run_ga(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", max_failures = 20) -> Tuple[np.ndarray, bool, int, int, float]:
     # Step 1: initiate random population of size N, length l
     rng = np.random.default_rng()
     P_old = rng.integers(0, 2, size=(N, l), dtype=np.int8)
     consecutive_failures = 0
     total_generations = 0
     total_fitness_evaluations = 0
+    t0 = time.perf_counter()
 
     # Step 2: run 'ga_iteration' iteratively to generate new populations
     while consecutive_failures < max_failures:
@@ -119,8 +121,9 @@ def run_ga(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX",
 
         # Step 3: Check for global optimum in new population, or if no improvement has been made for the past 20 generations
         if global_optimum_found:
+            total_time = time.perf_counter() - t0
             print(f"global optimum found: True, total generations: {total_generations}")
-            return P_new, True, total_generations
+            return P_new, True, total_generations, total_fitness_evaluations, total_time
         else:
             if not improve_flag:
                 consecutive_failures += 1
@@ -128,7 +131,8 @@ def run_ga(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX",
                 consecutive_failures = 0
         print(f"global optimum found: False, total generations: {total_generations}, consecutive failures: {consecutive_failures}")
 
-    return P_new, False, total_generations
+    total_time = time.perf_counter() - t0
+    return P_new, False, total_generations, total_fitness_evaluations, total_time
 
 
 
@@ -155,12 +159,12 @@ if __name__ == "__main__":
     # print("Mean fitness P1 (2X):", fitness_counting_ones(P1_2x).mean())
     # print("Tie test passed (children selected on equal fitness).")
     #
-    k = 4
-    d = 2.5
-
-    fitness_tight = partial(trap_function_tightly_linked, k=k, d=d)
-    fitness_nontight = partial(trap_function_non_tightly_linked, k=k, d=d)
-
-    final_population, ok, gens = run_ga(N=10, l=12, fitness_fn=fitness_nontight, crossover="UX")
+    # k = 4
+    # d = 2.5
+    #
+    # fitness_tight = partial(trap_function_tightly_linked, k=k, d=d)
+    # fitness_nontight = partial(trap_function_non_tightly_linked, k=k, d=d)
+    #
+    # final_population, ok, gens, evals, total_time = run_ga(N=10, l=12, fitness_fn=fitness_nontight, crossover="UX")
     print()
 
