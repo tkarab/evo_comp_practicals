@@ -14,18 +14,25 @@ final_population, ok, gens = run_ga(N=10, l=12, fitness_fn=fitness_nontight, cro
 """
 
 from __future__ import annotations
+
+import os
 from functools import partial
 import io
 import time
 from contextlib import redirect_stdout
 from dataclasses import dataclass
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Literal
 import statistics
 
 import numpy as np
+import pandas as pd
 
 from ga_functions import run_ga
 from helper_functions import CrossoverType, fitness_counting_ones, trap_function_tightly_linked, trap_function_non_tightly_linked
+
+ExperimentName = Literal["Ex1", "Ex2", "Ex3", "Ex4", "Ex5"]
+EXPERIMENT : ExperimentName = "Ex1"
+
 
 
 @dataclass
@@ -80,8 +87,9 @@ def search_optimal_N(
     crossover: CrossoverType,
     N_start: int = 10,
     N_cap: int = 1280,
-) -> Tuple[int | None, List[TrialSummary]]:
+) -> Tuple[int | None, List[TrialSummary], TrialSummary]:
     results: List[TrialSummary] = []
+    n_final_summary : TrialSummary = None
 
     # initial run for N=10
     N = N_start
@@ -89,7 +97,8 @@ def search_optimal_N(
     results.append(summary)
 
     if summary.solved:
-        return N, results
+        n_final_summary = summary
+        return N, results, n_final_summary
 
     # Double until find N_high (first success) or hit cap
     N_low = N
@@ -102,6 +111,7 @@ def search_optimal_N(
         summary = run_10_trials(N, l, fitness_fn, crossover)
         results.append(summary)
         if summary.solved:
+            n_final_summary = summary
             N_high = N
             break
         N_low = N
@@ -124,11 +134,29 @@ def search_optimal_N(
         results.append(summary)
 
         if summary.solved:
+            n_final_summary = summary
             N_high = N_new
         else:
             N_low = N_new
 
-    return N_high, results
+    return N_high, results, n_final_summary
+
+
+def save_N_final_summary_results(n_final:int, n_final_summary:TrialSummary, crossover_method) -> None:
+    results_df = pd.DataFrame({
+        "Generations": n_final_summary.generations_success,
+        "Evaluations": n_final_summary.evaluations_list,
+        "Trial Times": n_final_summary.trial_times,
+    })
+
+    filename = f"Results_{EXPERIMENT}_N_{n_final}_crossover_{crossover_method}.csv"
+    full_path = os.path.join("results", filename)
+
+    results_df.to_csv(full_path, index=False)
+
+    print(f"Results saved to {full_path}")
+
+    return None
 
 
 def print_results(results: List[TrialSummary]) -> None:
