@@ -21,7 +21,7 @@ import io
 import time
 from contextlib import redirect_stdout
 from dataclasses import dataclass
-from typing import Callable, List, Tuple, Literal
+from typing import Callable, List, Tuple, Literal, Optional
 import statistics
 
 import numpy as np
@@ -30,9 +30,25 @@ import pandas as pd
 from ga_functions import run_ga
 from helper_functions import CrossoverType, fitness_counting_ones, trap_function_tightly_linked, trap_function_non_tightly_linked
 
-ExperimentName = Literal["Ex1", "Ex2", "Ex3", "Ex4", "Ex5"]
-EXPERIMENT : ExperimentName = "Ex1"
+FitnessFnName = Literal["CountingOnes","TrapTight","TrapNonTight"]
 
+@dataclass(frozen=True)
+class ExperimentConfig:
+    fitness_fn_name: FitnessFnName
+    max_failures: int = 20
+    k: Optional[int] = None
+    d: Optional[float] = None
+
+ExperimentName = Literal["Ex1", "Ex2", "Ex3", "Ex4", "Ex5"]
+CHOSEN_EX : ExperimentName = "Ex1"
+
+EXPERIMENTS = {
+    "Ex1" : ExperimentConfig(fitness_fn_name="CountingOnes"),
+    "Ex2" : ExperimentConfig(fitness_fn_name="TrapTight", k=4, d=1),
+    "Ex3" : ExperimentConfig(fitness_fn_name="TrapTight", k=4, d=2.5),
+    "Ex4" : ExperimentConfig(fitness_fn_name="TrapNonTight", k=4, d=1),
+    "Ex5" : ExperimentConfig(fitness_fn_name="TrapNonTight", k=4, d=2.5),
+}
 
 
 @dataclass
@@ -72,7 +88,8 @@ def run_10_trials(
             success_count += 1
             generations_success.append(gens)
             evaluations.append(fit_evals)
-            trial_times.append(total_time)
+            trial_times.append(1000*total_time)
+
 
     return TrialSummary(N=N, success_count=success_count, generations_success=generations_success, evaluations_list=evaluations, trial_times=trial_times)
 
@@ -149,7 +166,7 @@ def save_N_final_summary_results(n_final:int, n_final_summary:TrialSummary, cros
         "Trial Times": n_final_summary.trial_times,
     })
 
-    filename = f"Results_{EXPERIMENT}_N_{n_final}_crossover_{crossover_method}.csv"
+    filename = f"Results_{CHOSEN_EX}_N_{n_final}_crossover_{crossover_method}.csv"
     full_path = os.path.join("results", filename)
 
     results_df.to_csv(full_path, index=False)
@@ -164,57 +181,69 @@ def print_results(results: List[TrialSummary]) -> None:
     for r in results:
         gens_list = ", ".join(str(g) for g in r.generations_success)
         print(f"N={r.N:4d}  success={r.success_count}/10  solved={r.solved}  "
-              f"average time={statistics.mean(r.trial_times):.3f}s  gens(successes)=[{gens_list}]")
+              f"average time={(statistics.mean(r.trial_times) if r.trial_times else 0):.3f}ms  gens(successes)=[{gens_list}]")
 
 
-def main() -> None:
-    N = 10
-    l = 12
-    crossover = "UX"
-    k = 4
-    d = 2.5
+# def main() -> None:
+#     N = 10
+#     l = 12
+#     crossover = "UX"
+#     k = 4
+#     d = 2.5
+#
+#     fitness_function = [
+#         ("CountingOnes", fitness_counting_ones),
+#         ("TrapTight", partial(trap_function_tightly_linked, k=k, d=d)),
+#         ("TrapNonTight", partial(trap_function_non_tightly_linked, k=k, d=d)),
+#     ]
+#
+#     for name, fitness_fn in fitness_function:
+#         final_population, ok, gens, evals, total_time = run_ga(
+#             N=N,
+#             l=l,
+#             fitness_fn=fitness_fn,
+#             crossover=crossover
+#         )
+#         print(f"{name}: ok={ok}, gens={gens}, best_fitness={fitness_fn(final_population).max()}")
 
-    fitness_function = [
-        ("CountingOnes", fitness_counting_ones),
-        ("TrapTight", partial(trap_function_tightly_linked, k=k, d=d)),
-        ("TrapNonTight", partial(trap_function_non_tightly_linked, k=k, d=d)),
-    ]
 
-    for name, fitness_fn in fitness_function:
-        final_population, ok, gens, evals, total_time = run_ga(
-            N=N,
-            l=l,
-            fitness_fn=fitness_fn,
-            crossover=crossover
-        )
-        print(f"{name}: ok={ok}, gens={gens}, best_fitness={fitness_fn(final_population).max()}")
-
-
-"""
 def main() -> None:
     l = 40
-    crossover = "UX"
-    k = 4
-    d = 2.5
 
-    fitness_function = [
-        ("CountingOnes", fitness_counting_ones),
-        ("TrapTight", partial(trap_function_tightly_linked, k=k, d=d)),
-        ("TrapNonTight", partial(trap_function_non_tightly_linked, k=k, d=d)),
-    ]
+    Ex_config : ExperimentConfig = EXPERIMENTS[CHOSEN_EX]
 
-    for name, fitness_fn in fitness_function:
-        print(f"\n--- {name} ---")
-        N_final, results = search_optimal_N(
+    k = Ex_config.k
+    d = Ex_config.d
+
+    fitness_function = {
+        "CountingOnes": fitness_counting_ones,
+        "TrapTight": partial(trap_function_tightly_linked, k=k, d=d),
+        "TrapNonTight": partial(trap_function_non_tightly_linked, k=k, d=d),
+    }
+
+    fitness_fn = fitness_function[Ex_config.fitness_fn_name]
+
+
+    # for name, fitness_fn in fitness_function:
+    print(f"Experiment: {CHOSEN_EX}\nConfigurations:"
+          f"\n\tFitness: {Ex_config.fitness_fn_name}"
+          f"\n\tk: {Ex_config.k}"
+          f"\n\td: {Ex_config.d}")
+
+    for crossover in ["UX", "2X"]:
+        print(f"\n\nCrossover: {crossover}")
+
+        N_final, results, n_final_summary = search_optimal_N(
             l=l,
             fitness_fn=fitness_fn,
             crossover=crossover,
             N_start=10,
             N_cap=1280
         )
+        save_N_final_summary_results(n_final=N_final, n_final_summary=n_final_summary, crossover_method=crossover)
         print_results(results)
-        print("N_final:", N_final)
-"""
+        print(f"N_final ({crossover}):", N_final)
+
 
 
 if __name__ == "__main__":
