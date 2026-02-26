@@ -122,9 +122,10 @@ def search_optimal_N(
     N_high = None
 
     while True:
+        print(f"N={N} failed, trying {2*N}")
         N = N * 2
         if N > N_cap:
-            return None, results  # Fail
+            return None, results, None  # Fail
         summary = run_10_trials(N, l, fitness_fn, crossover)
         results.append(summary)
         if summary.solved:
@@ -138,9 +139,11 @@ def search_optimal_N(
 
     # Bisection until N_final
     # Maintain invariant: N_low fails, N_high succeeds
+    print("Bisection search")
     while (N_high - N_low) > 10:
         N_new_raw = (N_low + N_high) // 2
         N_new = as_multiple_of_10(N_new_raw)
+        print(f"Trying {N_new}")
 
         if N_new <= N_low:
             N_new = N_low + 10
@@ -153,6 +156,7 @@ def search_optimal_N(
         if summary.solved:
             n_final_summary = summary
             N_high = N_new
+            print(f"New best: {N_new}")
         else:
             N_low = N_new
 
@@ -230,6 +234,9 @@ def main() -> None:
           f"\n\tk: {Ex_config.k}"
           f"\n\td: {Ex_config.d}")
 
+    N_start = 10
+    N_max = 1280
+
     for crossover in ["UX", "2X"]:
         print(f"\n\nCrossover: {crossover}")
 
@@ -237,12 +244,15 @@ def main() -> None:
             l=l,
             fitness_fn=fitness_fn,
             crossover=crossover,
-            N_start=10,
-            N_cap=1280
+            N_start=N_start,
+            N_cap=N_max
         )
-        save_N_final_summary_results(n_final=N_final, n_final_summary=n_final_summary, crossover_method=crossover)
-        print_results(results)
-        print(f"N_final ({crossover}):", N_final)
+        if N_final is not None:
+            save_N_final_summary_results(n_final=N_final, n_final_summary=n_final_summary, crossover_method=crossover)
+            print_results(results)
+            print(f"N_final ({crossover}):", N_final)
+        else:
+            print(f"Experiment {CHOSEN_EX} failed for Crossover: {crossover}, N exceeded {N_max}")
 
 
 
