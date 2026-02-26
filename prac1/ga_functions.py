@@ -9,7 +9,7 @@ from helper_functions import fitness_counting_ones, fitness_helper_B, trap_funct
 
 FitnessFn = Callable[[np.ndarray], np.ndarray]
 
-def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> Tuple[np.ndarray, bool]:
+def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> Tuple[np.ndarray, bool, int]:
     improvement = False
 
     if rng is None:
@@ -34,6 +34,8 @@ def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType 
     P_next = np.empty_like(P_shuf)
     is_child = np.array([0, 0, 1, 1], dtype=np.int8)
 
+
+    total_fitness_evaluations = 0   # this stores the total number of solutions that are evaluated = total number of strings the fitness functions is applied to
     out = 0
     for i in range(0, N, 2):
         p1 = P_shuf[i]
@@ -41,6 +43,8 @@ def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType 
         c1, c2 = recombination(p1, p2, rng)
 
         family = np.stack([p1, p2, c1, c2], axis=0)
+
+        total_fitness_evaluations += family.shape[0]    # total evaluations for this family -> number of family members that are evaluated
 
         fit = np.asarray(fitness_fn(family))
 
@@ -69,7 +73,7 @@ def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType 
         P_next[out + 1] = winners[1]
         out += 2
 
-    return P_next, improvement
+    return P_next, improvement, total_fitness_evaluations
 
 
 """
@@ -101,12 +105,15 @@ def run_ga(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX",
     P_old = rng.integers(0, 2, size=(N, l), dtype=np.int8)
     consecutive_failures = 0
     total_generations = 0
+    total_fitness_evaluations = 0
 
     # Step 2: run 'ga_iteration' iteratively to generate new populations
     while consecutive_failures < max_failures:
-        P_new, improve_flag = ga_iteration(P_old, fitness_fn, crossover=crossover, rng=rng)
+        P_new, improve_flag, iter_evaluations = ga_iteration(P_old, fitness_fn, crossover=crossover, rng=rng)
         P_old = P_new
         total_generations += 1
+        total_fitness_evaluations += iter_evaluations
+
 
         global_optimum_found = np.any(np.all(P_new == 1, axis=1))
 
@@ -148,12 +155,12 @@ if __name__ == "__main__":
     # print("Mean fitness P1 (2X):", fitness_counting_ones(P1_2x).mean())
     # print("Tie test passed (children selected on equal fitness).")
     #
-    # k = 4
-    # d = 2.5
-    #
-    # fitness_tight = partial(trap_function_tightly_linked, k=k, d=d)
-    # fitness_nontight = partial(trap_function_non_tightly_linked, k=k, d=d)
-    #
-    # final_population, ok, gens = run_ga(N=10, l=12, fitness_fn=fitness_nontight, crossover="UX")
+    k = 4
+    d = 2.5
+
+    fitness_tight = partial(trap_function_tightly_linked, k=k, d=d)
+    fitness_nontight = partial(trap_function_non_tightly_linked, k=k, d=d)
+
+    final_population, ok, gens = run_ga(N=10, l=12, fitness_fn=fitness_nontight, crossover="UX")
     print()
 
