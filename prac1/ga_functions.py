@@ -61,9 +61,9 @@ def ga_iteration(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType 
         #         improvement = True
 
         if not improvement:
-            parents_min = fit[:2].min()  # indices 0,1
+            parents_max = fit[:2].max()  # indices 0,1
             children_max = fit[2:].max()  # indices 2,3
-            improvement = children_max > parents_min
+            improvement = children_max > parents_max
 
         if debug_ties:
             # Rule to pick children in case of a tie
