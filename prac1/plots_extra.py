@@ -1,26 +1,55 @@
-import numpy as np
-from typing import Optional, List
+from __future__ import annotations
+
+import os
 import time
+from dataclasses import dataclass
+from typing import Callable, List, Optional, Tuple
 
-from ga_functions import FitnessFn, CrossoverType
-from helper_functions import *
-
+import numpy as np
 from matplotlib import pyplot as plt
 
+from helper_functions import (
+    CrossoverType,
+    fitness_counting_ones,
+    two_point_crossover,
+    uniform_crossover,
+)
+
+FitnessFn = Callable[[np.ndarray], np.ndarray]
 
 
-def ga_iteration_extra(P: np.ndarray, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", rng: Optional[np.random.Generator] = None, debug_ties: bool = False) -> Tuple[np.ndarray, bool, int]:
-    improvement = False
+# Per-generation metrics container
 
+@dataclass
+class GenMetrics:
+    prop_ones: float
+    err: int
+    corr: int
+    schema1_count: int
+    schema0_count: int
+    schema1_mean: float
+    schema1_sd: float
+    schema0_mean: float
+    schema0_sd: float
+
+
+# One GA iteration
+
+def ga_iteration_extra(
+        P: np.ndarray,
+        fitness_fn: FitnessFn,
+        crossover: CrossoverType = "UX",
+        rng: Optional[np.random.Generator] = None,
+) -> Tuple[np.ndarray, bool, int, int, int]:
     if rng is None:
         rng = np.random.default_rng()
 
     P = np.asarray(P)
     if P.ndim != 2:
-        raise ValueError(f"P is wrong shape. Current shape {P.shape}")
+        raise ValueError(f"P must be 2D")
     N, L = P.shape
     if N % 2 != 0:
-        raise ValueError(f"Population size should be even. Current N={N}")
+        raise ValueError(f"Population size must be even")
 
     P_shuf = P[rng.permutation(N)]
 
@@ -29,13 +58,16 @@ def ga_iteration_extra(P: np.ndarray, fitness_fn: FitnessFn, crossover: Crossove
     elif crossover == "2X":
         recombination = two_point_crossover
     else:
-        raise ValueError("crossover must be 'UX' or '2X'")
+        raise ValueError("crossover must be UX or 2X")
 
     P_next = np.empty_like(P_shuf)
     is_child = np.array([0, 0, 1, 1], dtype=np.int8)
 
+    fitness_evals = 0
+    improvement = False
+    err_t = 0
+    corr_t = 0
 
-    total_fitness_evaluations = 0   # this stores the total number of solutions that are evaluated = total number of strings the fitness functions is applied to
     out = 0
     for i in range(0, N, 2):
         p1 = P_shuf[i]
@@ -43,128 +75,215 @@ def ga_iteration_extra(P: np.ndarray, fitness_fn: FitnessFn, crossover: Crossove
         c1, c2 = recombination(p1, p2, rng)
 
         family = np.stack([p1, p2, c1, c2], axis=0)
-
-        total_fitness_evaluations += family.shape[0]    # total evaluations for this family -> number of family members that are evaluated
+        fitness_evals += 4
 
         fit = np.asarray(fitness_fn(family))
-
         if fit.shape != (4,):
-            raise ValueError(f"fitness_fn should return proper shape, got {fit.shape}")
+            raise ValueError(f"fitness wrong shape")
 
         order = np.lexsort((-is_child, -fit))
         winners_idx = order[:2]
         winners = family[winners_idx]
 
         if not improvement:
-            parents_min = fit[:2].min()  # indices 0,1
-            children_max = fit[2:].max()  # indices 2,3
-            improvement = children_max > parents_min
+            parents_max = float(fit[:2].max())
+            children_max = float(fit[2:].max())
+            if children_max > parents_max:
+                improvement = True
 
-        if debug_ties:
-            # Rule to pick children in case of a tie
-            if np.all(fit == fit[0]):
-                print(f"Family all-tied fit={fit[0]} winners_idx={winners_idx}")
+        # Err/Corr for family
+        disagree = (p1 != p2)
+        if np.any(disagree):
+            wbits = winners[:, disagree]
+            err_t += int(np.sum(np.all(wbits == 0, axis=0)))
+            corr_t += int(np.sum(np.all(wbits == 1, axis=0)))
 
         P_next[out] = winners[0]
         P_next[out + 1] = winners[1]
         out += 2
 
-    return P_next, improvement, total_fitness_evaluations
+    return P_next, improvement, fitness_evals, err_t, corr_t
 
 
-"""
-This Function is based on the function 'run_ga' in file 'ga_functions.py', with minor tweaks to cover the extra questions
+# Schema stats
 
-Additions:
-    - The stop condition is that all population members should converge to global optimum '111...11' for the algorithm to stop 
-    - Added return value prop(t) (List[float]) where prop(t) is the percentage of '1's within the population, for each generation t. 
-      It is calculated by taking the mean fitness value of each generation (since fitness == Count Ones) and dividing by the string length l
-      
- 
-"""
-def run_ga_extra(N:int, l:int, fitness_fn: FitnessFn, crossover: CrossoverType = "UX", max_failures = 20) -> Tuple[np.ndarray, bool, int, int, float, List[float]]:
-    # Step 1: initiate random population of size N, length l
-    rng = np.random.default_rng()
-    P_old = rng.integers(0, 2, size=(N, l), dtype=np.int8)
-    consecutive_failures = 0
+def _mean_sd(arr: np.ndarray) -> Tuple[float, float]:
+    if arr.size == 0:
+        return np.nan, np.nan
+    if arr.size == 1:
+        return float(arr[0]), 0.0
+    return float(np.mean(arr)), float(np.std(arr, ddof=1))
+
+
+def schema_stats(P: np.ndarray, fitness_vals: np.ndarray) -> Tuple[int, int, float, float, float, float]:
+    first = P[:, 0]
+    idx1 = (first == 1)
+    idx0 = ~idx1
+
+    count1 = int(np.sum(idx1))
+    count0 = int(np.sum(idx0))
+
+    mean1, sd1 = _mean_sd(fitness_vals[idx1])
+    mean0, sd0 = _mean_sd(fitness_vals[idx0])
+
+    return count1, count0, mean1, sd1, mean0, sd0
+
+
+# Run of GA
+
+def run_ga_extra(
+        N: int,
+        L: int,
+        fitness_fn: FitnessFn,
+        crossover: CrossoverType = "UX",
+        max_failures: int = 20,
+        seed: Optional[int] = 42,
+) -> Tuple[bool, int, int, float, List[GenMetrics]]:
+    rng = np.random.default_rng(seed)
+
+    P = rng.integers(0, 2, size=(N, L), dtype=np.int8)
+
     total_generations = 0
-    total_fitness_evaluations = 0
+    total_evals = 0
+    consecutive_failures = 0
+    metrics: List[GenMetrics] = []
+
     t0 = time.perf_counter()
 
-    # Extra Question 1: prop(t) -> percentage of '1' in total population
-    prop_ones : List[float] = [np.mean(fitness_fn(P_old)) / l]
+    fit0 = np.asarray(fitness_fn(P))
+    prop0 = float(np.mean(fit0) / L)
+    c1, c0, m1, s1, m0, s0 = schema_stats(P, fit0)
+    metrics.append(GenMetrics(prop0, 0, 0, c1, c0, m1, s1, m0, s0))
 
-    # Step 2: run 'ga_iteration' iteratively to generate new populations
     while consecutive_failures < max_failures:
-        P_new, improve_flag, iter_evaluations = ga_iteration_extra(P_old, fitness_fn, crossover=crossover, rng=rng)
-        P_old = P_new
+        P, improved, evals, err_t, corr_t = ga_iteration_extra(P, fitness_fn, crossover=crossover, rng=rng)
         total_generations += 1
-        total_fitness_evaluations += iter_evaluations
+        total_evals += evals
 
-        # Calculating prop(t): In this case total percentage of ones = (sum(count_ones(Population))) / (N*l) => avg(fitness(Population)) / l [since fitness function for this experiment is 'Count Ones']
-        mean_fitness = np.mean(fitness_fn(P_new))
-        prop_ones.append(mean_fitness/l)
+        fit = np.asarray(fitness_fn(P))
+        prop = float(np.mean(fit) / L)
 
+        c1, c0, m1, s1, m0, s0 = schema_stats(P, fit)
+        metrics.append(GenMetrics(prop, err_t, corr_t, c1, c0, m1, s1, m0, s0))
 
-        # New stop condition -> all population converges to '1111...111'
-        stop_condition = np.all(np.all(P_new == 1, axis=1))
-        print(
-            f"Generation: {total_generations}\n\tPopulation Converged: {stop_condition}\n\tMean Fitness: {mean_fitness:.2f}\n\tConsecutive Failures: {consecutive_failures}\n")
-
-        # Step 3: Check for global optimum in new population, or if no improvement has been made for the past 20 generations
-        if stop_condition:
+        if bool(np.all(P == 1)):
             total_time = time.perf_counter() - t0
+            return True, total_generations, total_evals, total_time, metrics
 
-            return P_new, True, total_generations, total_fitness_evaluations, total_time, prop_ones
+        if not improved:
+            consecutive_failures += 1
         else:
-            if not improve_flag:
-                consecutive_failures += 1
-            else:
-                consecutive_failures = 0
-
+            consecutive_failures = 0
 
     total_time = time.perf_counter() - t0
-    return P_new, False, total_generations, total_fitness_evaluations, total_time, prop_ones
-
-def plot_metrics(gens:int, prop_t: List[float], corr_t:List[int], err_t:List[int]):
-    # x axis: number of generations (starting at 0)
-    x = np.arange(gens+1)
-
-    # 1. Plot prop(t)
-    plt.plot(x, prop_t)
-    plt.xticks(x)
-    plt.title("Proportion of bits-1 in total population")
-    plt.xlabel("Generations")
-    plt.ylabel("ptop(t)")
-
-    plt.savefig(r"plots/1_prop_t.png", dpi=300, bbox_inches="tight")
-    plt.show()
+    return False, total_generations, total_evals, total_time, metrics
 
 
-    # 2. err(t) vs corr(t)
+# Plotting
+
+def plot_all(metrics: List[GenMetrics], out_dir: str = "plots") -> None:
+    os.makedirs(out_dir, exist_ok=True)
+
+    t = np.arange(len(metrics))
+
+    prop = np.array([m.prop_ones for m in metrics], dtype=float)
+    err = np.array([m.err for m in metrics], dtype=int)
+    corr = np.array([m.corr for m in metrics], dtype=int)
+
+    s1c = np.array([m.schema1_count for m in metrics], dtype=int)
+    s0c = np.array([m.schema0_count for m in metrics], dtype=int)
+
+    s1m = np.array([m.schema1_mean for m in metrics], dtype=float)
+    s1s = np.array([m.schema1_sd for m in metrics], dtype=float)
+    s0m = np.array([m.schema0_mean for m in metrics], dtype=float)
+    s0s = np.array([m.schema0_sd for m in metrics], dtype=float)
+
+    # 1) prop(t)
+    plt.figure()
+    plt.plot(t, prop)
+    plt.title("prop(t): proportion of 1-bits in the population")
+    plt.xlabel("Generation t")
+    plt.ylabel("prop(t)")
+    plt.ylim(0.0, 1.05)
+    plt.savefig(os.path.join(out_dir, "1_prop_t.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    # 2) Err(t) and Correct(t)
+    plt.figure()
+    plt.plot(t, err, label="Err(t)")
+    plt.plot(t, corr, label="Correct(t)")
+    plt.title("Selection decisions per generation")
+    plt.xlabel("Generation t")
+    plt.ylabel("Count")
+    plt.legend()
+    plt.savefig(os.path.join(out_dir, "2_err_corr_t.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    # 3) Schema counts
+    plt.figure()
+    plt.plot(t, s1c, label="Schema 1******** (bit1=1)")
+    plt.plot(t, s0c, label="Schema 0******** (bit1=0)")
+    plt.title("Schema membership counts")
+    plt.xlabel("Generation t")
+    plt.ylabel("Count in population")
+    plt.legend()
+    plt.savefig(os.path.join(out_dir, "3_schema_counts_t.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    # 4) Schema mean fitness
+    plt.figure()
+    plt.plot(t, s1m, label="Schema1 mean")
+    plt.plot(t, s0m, label="Schema0 mean")
+    plt.title("Schema mean fitness")
+    plt.xlabel("Generation t")
+    plt.ylabel("Mean fitness")
+    plt.legend()
+    plt.savefig(os.path.join(out_dir, "4_schema_mean_fitness_t.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    # 5) Schema fitness sd
+    plt.figure()
+    plt.plot(t, s1s, label="Schema1 sd")
+    plt.plot(t, s0s, label="Schema0 sd")
+    plt.title("Schema fitness standard deviation")
+    plt.xlabel("Generation t")
+    plt.ylabel("SD of fitness")
+    plt.legend()
+    plt.savefig(os.path.join(out_dir, "5_schema_sd_fitness_t.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved plots to: {out_dir}/")
+    print("1_prop_t.png")
+    print("2_err_corr_t.png")
+    print("3_schema_counts_t.png")
+    print("4_schema_mean_fitness_t.png")
+    print("5_schema_sd_fitness_t.png")
 
 
-    # 3. schema 1#### vs 0####
-
-
-    return
-
+# Main
 
 def main() -> None:
-    # Settings are fixed to the following values for this experiment
     N = 200
     L = 40
-    fitness_fn : FitnessFn = fitness_counting_ones
-    crossover : CrossoverType = "UX"
-    # max_failures = 50     # just in case
+    crossover: CrossoverType = "UX"
+    fitness_fn = fitness_counting_ones
 
-    P_final, success, gens, evals, time, prop_t = run_ga_extra(N=N, l=L, fitness_fn=fitness_fn, crossover=crossover)
+    ok, gens, evals, total_time, metrics = run_ga_extra(
+        N=N,
+        L=L,
+        fitness_fn=fitness_fn,
+        crossover=crossover,
+        max_failures=20,
+        seed=42,
+    )
 
-    if success:
-        plot_metrics(gens=gens, prop_t=prop_t, err_t=[], corr_t=[])
+    print(f"Done. ok={ok} gens={gens} evals={evals} time={total_time:.3f}s")
 
-    else:
-        print("Population failed to converge, no plots available")
+    if not ok:
+        print("population did not fully converge to all-ones before stopping")
+
+    plot_all(metrics, out_dir="prac1/plots")
+
 
 if __name__ == "__main__":
     main()
