@@ -3,8 +3,6 @@ from typing import List
 import random
 import numpy as np
 
-total_checks_1 = 0
-total_checks_2 = 0
 
 class Graph:
     def __init__(self, vertex_number=None, edges=None, filename=None):
@@ -67,12 +65,10 @@ class GraphColoring:
 def get_conflicts_1(graph:Graph, coloring: GraphColoring) -> int:
     num_colors = coloring.number_of_colors
     conflicts = 0
-    global total_checks_1
 
     for color_index in range(num_colors):
         color_class = coloring.partition[color_index]
-        m = len(color_class)
-        total_checks_1 += (m)*(m-1)//2
+        # m = len(color_class)
 
         for i, vertex in enumerate(color_class):
             for other_vertex in color_class[i+1:]:
@@ -84,13 +80,12 @@ def get_conflicts_1(graph:Graph, coloring: GraphColoring) -> int:
 
 def get_conflicts_2(graph: Graph, coloring: GraphColoring) -> int:
     conflicts = 0
-    global total_checks_2
 
     for vertex in range(graph.vertex_number):
         vertex_color = coloring.assignment[vertex]
 
         for neighbor in graph.edges[vertex]:
-            total_checks_2 += 1
+
 
             if coloring.assignment[neighbor] == vertex_color:
                 conflicts += 1
@@ -148,19 +143,4 @@ def vertex_descent_full_run(graph: Graph, coloring: GraphColoring, L: int) -> tu
 
     return coloring, False
 
-
-
-n = 10
-k = 3
-colors_assignment = [0,1,0,2,1]
-
-coloring = GraphColoring(k, colors_assignment)
-graph = Graph(filename = "test_graph.col.doc")
-
-conflict1 = get_conflicts_1(graph, coloring)
-conflict2 = get_conflicts_2(graph, coloring)
-
-new_coloring, solved, improved = vertex_descent_iteration(graph, coloring)
-
-print()
 
