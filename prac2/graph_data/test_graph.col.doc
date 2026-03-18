@@ -1,0 +1,10 @@
+c File: test_graph.col
+c
+c DESCRIPTION: Test file containing dummy values - strictly for testing purposes. Graph of 5 vertices and 6 edges
+p edge 5 6
+e 2 1
+e 3 1
+e 4 2
+e 5 2
+e 5 3
+e 5 4
