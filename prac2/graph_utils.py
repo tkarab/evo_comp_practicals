@@ -144,18 +144,3 @@ def vertex_descent_full_run(graph: Graph, coloring: GraphColoring, L: int) -> tu
     return coloring, False
 
 
-
-n = 10
-k = 3
-colors_assignment = [0,1,0,2,1]
-
-coloring = GraphColoring(k, colors_assignment)
-graph = Graph(filename = "test_graph.col.doc")
-
-conflict1 = get_conflicts_1(graph, coloring)
-conflict2 = get_conflicts_2(graph, coloring)
-
-new_coloring, solved, improved = vertex_descent_iteration(graph, coloring)
-
-print()
-
