@@ -102,18 +102,9 @@ def vertex_descent_iteration(
     improvement = False
 
     current_conflicts = get_conflicts_1(graph, coloring)
-    time_per_vertex = []
-
-    if debug:
-        print("\nStarting descent iteration")
-        print("Initial assignment:", coloring.assignment)
-        print("Initial conflicts :", current_conflicts)
-        print("Vertex order      :", vertices_random_order)
 
     for vertex in vertices_random_order:
-        t1 = time.perf_counter()
         old_color = coloring.assignment[vertex]
-
 
         neighbors = graph.edges[vertex]
         color_counts = [0] * k
@@ -136,46 +127,13 @@ def vertex_descent_iteration(
         )
 
         if new_conflicts == 0:
-            if debug:
-                print(f"[vertex {vertex}] color {old_color} -> {new_color}")
-                print(f"conflicts: {current_conflicts} -> {new_conflicts}")
-                print("Problem solved. Exiting algorithm.")
             return coloring, True, True
 
         if new_conflicts < current_conflicts:
             improvement = True
-            if debug:
-                print(f"[vertex {vertex}] improved: color {old_color} -> {new_color}")
-                print(
-                    f"vertex-conflicts: {color_counts[old_color]} -> {color_counts[new_color]}"
-                )
-                print(f"total conflicts: {current_conflicts} -> {new_conflicts}")
-                if len(best_color_candidates) > 1:
-                    print(
-                        f"tie among {len(best_color_candidates)} best colors: {best_color_candidates}"
-                    )
-
-        elif new_conflicts == current_conflicts:
-            if debug:
-                if len(best_color_candidates) == 1:
-                    print(f"[vertex {vertex}] no improvement, keeping color {old_color}")
-                else:
-                    print(
-                        f"[vertex {vertex}] tie between {len(best_color_candidates)} candidates: color {old_color} -> {new_color}"
-                    )
 
         current_conflicts = new_conflicts
-        t2 = time.perf_counter()
-        time_per_vertex.append(t2 - t1)
 
-
-    if debug:
-        print("\nEnd of descent iteration")
-        print("Final assignment:", coloring.assignment)
-        print("Final conflicts :", get_conflicts_1(graph, coloring))
-        print("Improvement     :", improvement)
-
-    print(f"Time per vertex:\n\tAvg:\t{np.mean(np.array(time_per_vertex))} sec\n\tTotal:\t{np.sum(np.array(time_per_vertex))} sec")
     return coloring, False, improvement
 
 
@@ -189,6 +147,7 @@ def vertex_descent_full_run(
 
     if debug:
         print(f"\nStarting full Vertex Descent run (max {L} cycles)")
+        print(f"Initial Conflicts: {get_conflicts_1(graph, coloring)}")
 
     while descent_cycles < L:
         if debug:
@@ -197,6 +156,9 @@ def vertex_descent_full_run(
         coloring, solved, improvement = vertex_descent_iteration(
             graph, coloring, debug=debug
         )
+
+        if debug:
+            print(f"Conflicts: {get_conflicts_1(graph, coloring)}, Improvement: {improvement}")
 
         if solved:
             if debug:
@@ -216,13 +178,31 @@ def vertex_descent_full_run(
     return coloring, False
 
 
-if __name__ == "__main__":
-    random.seed(42)
+config = {
+    "test_graph" : {
+        "filename" : "debug10.col.doc",
+        "k": 3,
+        "L": 10
+    },
+    "small_graph":{
+        "filename" : "flat300_26_0.col.rtf.doc",
+        "k": 28,
+        "L": 100
+    },
+    "big_graph":{
+        "filename" : "flat1000_76_0.col.rtf.doc",
+        "k": 83,
+        "L": 200
+    }
+}
 
-    filename = "flat300_26_0.col.rtf.doc"
-    # filename = "debug10.col.doc"
-    k = 28
-    L = 100
+if __name__ == "__main__":
+    # random.seed(42)
+
+    graph = "big_graph"
+    filename = config[graph]["filename"]
+    k = config[graph]["k"]
+    L = config[graph]["L"]
 
     graph = Graph(filename=filename)
 
@@ -237,7 +217,7 @@ if __name__ == "__main__":
         graph=graph,
         coloring=coloring,
         L=L,
-        debug=False
+        debug=True
     )
 
     print("\n" + "=" * 60)
