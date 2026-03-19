@@ -216,7 +216,7 @@ if __name__ == "__main__":
         graph=graph,
         coloring=coloring,
         L=L,
-        debug=True
+        debug=False
     )
 
     print("\n" + "=" * 60)
