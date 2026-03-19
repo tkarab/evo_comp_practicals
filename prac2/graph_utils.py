@@ -157,14 +157,11 @@ def vertex_descent_iteration_2(
 
         elif new_conflicts == current_conflicts:
             if debug:
-                if new_color == old_color:
+                if len(best_color_candidates) == 1:
                     print(f"[vertex {vertex}] no improvement, keeping color {old_color}")
                 else:
                     print(
-                        f"[vertex {vertex}] tie: changed color {old_color} -> {new_color}"
-                    )
-                    print(
-                        f"best tied colors ({len(best_color_candidates)}): {best_color_candidates}"
+                        f"[vertex {vertex}] tie between {len(best_color_candidates)} candidates: color {old_color} -> {new_color}"
                     )
 
         current_conflicts = new_conflicts
@@ -178,7 +175,7 @@ def vertex_descent_iteration_2(
         print("Final conflicts :", get_conflicts_1(graph, coloring))
         print("Improvement     :", improvement)
 
-    print(f"Time per vertex:\n\tAvg:\t{np.mean(np.array(time_per_vertex)):.2f} sec\n\tTotal:\t{np.sum(np.array(time_per_vertex)):.2f} sec")
+    print(f"Time per vertex:\n\tAvg:\t{np.mean(np.array(time_per_vertex))} sec\n\tTotal:\t{np.sum(np.array(time_per_vertex))} sec")
     return coloring, False, improvement
 
 
@@ -269,7 +266,7 @@ def vertex_descent_iteration_1(
         print("Improvement     :", improvement)
 
     print(
-        f"Time per vertex:\n\tAvg:\t{np.mean(np.array(time_per_vertex)):.2f} sec\n\tTotal:\t{np.sum(np.array(time_per_vertex)):.2f} sec")
+        f"Time per vertex:\n\tAvg:\t{np.mean(np.array(time_per_vertex))} sec\n\tTotal:\t{np.sum(np.array(time_per_vertex))} sec")
     return coloring, False, improvement
 
 
@@ -289,7 +286,7 @@ def vertex_descent_full_run(
         #     print(f"\n--- Descent cycle {descent_cycles + 1} ---")
         print(f"\n--- Descent cycle {descent_cycles + 1} ---")
 
-        coloring, solved, improvement = vertex_descent_iteration(
+        coloring, solved, improvement = vertex_descent_iteration_2(
             graph, coloring, debug=debug
         )
 
@@ -315,6 +312,7 @@ if __name__ == "__main__":
     random.seed(42)
 
     filename = "flat300_26_0.col.rtf.doc"
+    # filename = "debug10.col.doc"
     k = 28
     L = 100
 
@@ -327,7 +325,7 @@ if __name__ == "__main__":
     print("Initial conflicts (method 1):", get_conflicts_1(graph, coloring))
     print("Initial conflicts (method 2):", get_conflicts_2(graph, coloring))
 
-    vertex_descent_iteration = vertex_descent_iteration_1
+    # vertex_descent_iteration = vertex_descent_iteration_1
     # vertex_descent_iteration = vertex_descent_iteration_2
     final_coloring, solved = vertex_descent_full_run(
         graph=graph,
