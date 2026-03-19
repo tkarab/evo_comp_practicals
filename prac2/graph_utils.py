@@ -28,7 +28,7 @@ class Graph:
                     edge_list = [[] for i in range(n)]
 
                 elif line.startswith("e "):
-                    (i, j) = [int(num) for num in line.strip().split(" ")[-2:]]
+                    (i, j) = [int(num) for num in line.strip().replace("\\","").split(" ")[-2:]]
                     edge_list[i - 1].append(j - 1)
                     edge_list[j - 1].append(i - 1)
 
