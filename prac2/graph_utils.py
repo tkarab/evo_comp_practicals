@@ -179,97 +179,6 @@ def vertex_descent_iteration_2(
     return coloring, False, improvement
 
 
-
-def vertex_descent_iteration_1(
-    graph: Graph,
-    coloring: GraphColoring,
-    debug: bool = False
-) -> (GraphColoring, bool, bool):
-    k = coloring.number_of_colors
-    n = graph.vertex_number
-    vertices_random_order = random.sample(range(n), n)
-    improvement = False
-    time_per_vertex = []
-    current_conflicts = get_conflicts_1(graph, coloring)
-    if debug:
-        print("\nStarting descent iteration")
-        print("Initial assignment:", coloring.assignment)
-        print("Initial conflicts :", current_conflicts)
-        print("Vertex order      :", vertices_random_order)
-
-    for vertex in vertices_random_order:
-        t1 = time.perf_counter()
-        vertex_color = coloring.assignment[vertex]
-        best_color = vertex_color
-
-
-        if debug:
-            print(f"\nChecking vertex {vertex} (current color {vertex_color}) (conflicts {current_conflicts})")
-
-        for color_code in range(k):
-            if color_code != vertex_color:
-                coloring.change_color(vertex, color_code)
-                new_conflicts = get_conflicts_1(graph, coloring)
-
-                if debug:
-                    print(
-                        f"  Tried color {color_code}: "
-                        f"{new_conflicts} conflicts"
-                    )
-
-                # in case it is solved mid-way through
-                if new_conflicts == 0:
-                    if debug:
-                        print(f"  Solved: vertex {vertex} recolored to {color_code}")
-                        print("Final assignment:", coloring.assignment)
-                    return coloring, True, True
-
-                # Case 1: less conflicts -> better coloring
-                if new_conflicts < current_conflicts:
-                    if debug:
-                        print(
-                            f"  Improvement found: "
-                            f"conflicts {current_conflicts} -> {new_conflicts}"
-                        )
-                    current_conflicts = new_conflicts
-                    best_color = color_code
-                    improvement = True
-
-                # Case 2: Same conflicts -> tie; choosing randomly
-                elif new_conflicts == current_conflicts:
-                    chosen_color = random.choice([best_color, color_code])
-                    if debug and chosen_color != best_color:
-                        print(
-                            f"  Tie at {new_conflicts} conflicts "
-                            f"between colors {best_color} and {color_code}; "
-                            f"chose {chosen_color}"
-                        )
-                    best_color = chosen_color
-                    coloring.change_color(vertex, best_color)
-
-                # Case 3: More conflicts -> revert to best color so far
-                else:
-                    coloring.change_color(vertex, best_color)
-
-        if debug:
-            print(
-                f"Vertex {vertex} ends iteration with color {coloring.assignment[vertex]}"
-            )
-
-        t2 = time.perf_counter()
-        time_per_vertex.append(t2 - t1)
-
-    if debug:
-        print("\nEnd of descent iteration")
-        print("Final assignment:", coloring.assignment)
-        print("Final conflicts :", get_conflicts_1(graph, coloring))
-        print("Improvement     :", improvement)
-
-    print(
-        f"Time per vertex:\n\tAvg:\t{np.mean(np.array(time_per_vertex))} sec\n\tTotal:\t{np.sum(np.array(time_per_vertex))} sec")
-    return coloring, False, improvement
-
-
 def vertex_descent_full_run(
     graph: Graph,
     coloring: GraphColoring,
@@ -325,8 +234,6 @@ if __name__ == "__main__":
     print("Initial conflicts (method 1):", get_conflicts_1(graph, coloring))
     print("Initial conflicts (method 2):", get_conflicts_2(graph, coloring))
 
-    # vertex_descent_iteration = vertex_descent_iteration_1
-    # vertex_descent_iteration = vertex_descent_iteration_2
     final_coloring, solved = vertex_descent_full_run(
         graph=graph,
         coloring=coloring,
