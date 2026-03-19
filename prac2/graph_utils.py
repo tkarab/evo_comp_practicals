@@ -91,7 +91,7 @@ def get_conflicts_2(graph: Graph, coloring: GraphColoring) -> int:
     return conflicts // 2
 
 
-def vertex_descent_iteration_2(
+def vertex_descent_iteration(
     graph: Graph,
     coloring: GraphColoring,
     debug: bool = False
@@ -191,11 +191,10 @@ def vertex_descent_full_run(
         print(f"\nStarting full Vertex Descent run (max {L} cycles)")
 
     while descent_cycles < L:
-        # if debug:
-        #     print(f"\n--- Descent cycle {descent_cycles + 1} ---")
-        print(f"\n--- Descent cycle {descent_cycles + 1} ---")
+        if debug:
+            print(f"\n--- Descent cycle {descent_cycles + 1} ---")
 
-        coloring, solved, improvement = vertex_descent_iteration_2(
+        coloring, solved, improvement = vertex_descent_iteration(
             graph, coloring, debug=debug
         )
 
