@@ -63,7 +63,7 @@ class GraphColoring:
         self.partition[new_color].append(vertex)
 
 
-def get_conflicts_1(graph: Graph, coloring: GraphColoring) -> int:
+def get_conflict_count(graph: Graph, coloring: GraphColoring) -> int:
     num_colors = coloring.number_of_colors
     conflicts = 0
 
@@ -77,18 +77,18 @@ def get_conflicts_1(graph: Graph, coloring: GraphColoring) -> int:
 
     return conflicts
 
-
-def get_conflicts_2(graph: Graph, coloring: GraphColoring) -> int:
-    conflicts = 0
-
-    for vertex in range(graph.vertex_number):
-        vertex_color = coloring.assignment[vertex]
-
-        for neighbor in graph.edges[vertex]:
-            if coloring.assignment[neighbor] == vertex_color:
-                conflicts += 1
-
-    return conflicts // 2
+# Alternative method for conflict count (probably inferior to get_conflict_count, ignore for now)
+# def get_conflict_count_2(graph: Graph, coloring: GraphColoring) -> int:
+#     conflicts = 0
+#
+#     for vertex in range(graph.vertex_number):
+#         vertex_color = coloring.assignment[vertex]
+#
+#         for neighbor in graph.edges[vertex]:
+#             if coloring.assignment[neighbor] == vertex_color:
+#                 conflicts += 1
+#
+#     return conflicts // 2
 
 
 def vertex_descent_iteration(
@@ -101,7 +101,7 @@ def vertex_descent_iteration(
     vertices_random_order = random.sample(range(n), n)
     improvement = False
 
-    current_conflicts = get_conflicts_1(graph, coloring)
+    current_conflicts = get_conflict_count(graph, coloring)
 
     for vertex in vertices_random_order:
         old_color = coloring.assignment[vertex]
@@ -147,7 +147,7 @@ def vertex_descent_full_run(
 
     if debug:
         print(f"\nStarting full Vertex Descent run (max {L} cycles)")
-        print(f"Initial Conflicts: {get_conflicts_1(graph, coloring)}")
+        print(f"Initial Conflicts: {get_conflict_count(graph, coloring)}")
 
     while descent_cycles < L:
         if debug:
@@ -158,7 +158,7 @@ def vertex_descent_full_run(
         )
 
         if debug:
-            print(f"Conflicts: {get_conflicts_1(graph, coloring)}, Improvement: {improvement}")
+            print(f"Conflicts: {get_conflict_count(graph, coloring)}, Improvement: {improvement}")
 
         if solved:
             if debug:
@@ -210,8 +210,7 @@ if __name__ == "__main__":
     coloring = GraphColoring(k=k, assignment=initial_assignment)
 
     print("Initial random assignment:", coloring.assignment)
-    print("Initial conflicts (method 1):", get_conflicts_1(graph, coloring))
-    print("Initial conflicts (method 2):", get_conflicts_2(graph, coloring))
+    print("Initial conflicts:", get_conflict_count(graph, coloring))
 
     final_coloring, solved = vertex_descent_full_run(
         graph=graph,
@@ -223,5 +222,5 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Final assignment:", final_coloring.assignment)
     print("Final partition :", final_coloring.partition)
-    print("Final conflicts :", get_conflicts_1(graph, final_coloring))
+    print("Final conflicts :", get_conflict_count(graph, final_coloring))
     print("Solved          :", solved)
