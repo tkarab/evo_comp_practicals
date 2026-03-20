@@ -14,7 +14,7 @@ class Graph:
             raise ValueError("Provide either filename or (vertex_number, edges).")
 
         self.vertex_number = vertex_number
-        self.vertices = list(range(vertex_number))
+        self.vertices = set(range(vertex_number))
         self.edges = edges
 
     @staticmethod
@@ -41,10 +41,11 @@ class Graph:
 
 
 class GraphColoring:
-    def __init__(self, k: int, assignment: List[int]):
+    def __init__(self, k: int, graph:Graph, assignment: List[int]):
         self.k: int = k
         self.assignment: List[int] = assignment
         self.partition: List[List[int]] = [[] for i in range(k)]
+        self.graph:Graph = graph
 
         self.get_partition()
 
