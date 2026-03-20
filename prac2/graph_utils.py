@@ -41,14 +41,14 @@ class Graph:
 
 class GraphColoring:
     def __init__(self, k: int, assignment: List[int]):
-        self.number_of_colors: int = k
+        self.k: int = k
         self.assignment: List[int] = assignment
         self.partition: List[List[int]] = [[] for i in range(k)]
 
         self.get_partition()
 
     def get_partition(self):
-        for color_index in range(self.number_of_colors):
+        for color_index in range(self.k):
             self.partition[color_index] = (
                 np.where(np.array(self.assignment) == color_index)[0]
             ).tolist()
@@ -64,7 +64,7 @@ class GraphColoring:
 
 
 def get_conflict_count(graph: Graph, coloring: GraphColoring) -> int:
-    num_colors = coloring.number_of_colors
+    num_colors = coloring.k
     conflicts = 0
 
     # For each color class in the partition representation, check all pair combinations of vertices for potential neighbors
@@ -103,7 +103,7 @@ def vertex_descent_iteration(
     coloring: GraphColoring,
     debug: bool = False
 ) -> (GraphColoring, bool, bool):
-    k = coloring.number_of_colors
+    k = coloring.k
     n = graph.vertex_number
     vertices_random_order = random.sample(range(n), n)
     improvement = False
