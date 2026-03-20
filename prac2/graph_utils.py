@@ -14,6 +14,7 @@ class Graph:
             raise ValueError("Provide either filename or (vertex_number, edges).")
 
         self.vertex_number = vertex_number
+        self.vertices = list(range(vertex_number))
         self.edges = edges
 
     @staticmethod
