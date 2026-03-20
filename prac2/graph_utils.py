@@ -41,19 +41,91 @@ class Graph:
 
 
 class GraphColoring:
-    def __init__(self, k: int, graph:Graph, assignment: List[int]):
+    def __init__(self, k: int, graph:Graph, assignment: List[int] = None, partition: List[List[int]] = None):
+
+        # Check if Graph and k are properly provided
+        if k is None or graph is None:
+            raise ValueError("Must provide k and graph when creating GraphColoring instance.")
+        elif k <= 0:
+            raise ValueError("k must be greater than 0.")
+
+        # Assign k and graph
         self.k: int = k
-        self.assignment: List[int] = assignment
+        self.graph: Graph = graph
+
+        # Case 1: Assignment provided
+        if assignment is not None:
+            is_ok, message = self.assignment_sanity_check(assignment)
+            if not is_ok:
+                raise ValueError(message)
+
+            self.assignment: List[int] = assignment.copy()
+            self.create_partition_representation_from_assignment()
+
+        # Case 2: Partition provided
+        elif assignment is None and partition is not None:
+            is_ok, message = self.partition_sanity_check(partition)
+            if not is_ok:
+                raise ValueError(message)
+            self.partition: List[List[int]] = [color_class.copy() for color_class in partition]
+            self.create_assignment_representation_from_partition()
+
+        # Case 3: No representation provided
+        elif assignment is None and partition is None:
+            self.create_randomized_assignment()
+            self.create_partition_representation_from_assignment()
+
+        return
+
+    def assignment_sanity_check(self, assignment: List[int]) -> (bool, str):
+        if len(assignment) != self.graph.vertex_number:
+            return False, f"Assignment representation must have as many elements as total graph vertices ({self.graph.vertex_number})."
+
+        for color in assignment:
+            if color < 0 or color >= self.k:
+                return False, f"Each color code must be in the range [0, {self.k - 1}]."
+
+        return True, None
+
+    def partition_sanity_check(self, partition: List[List[int]]) -> (bool, str):
+        if len(partition) != self.k:
+            return False, f"Partition representation must have as many elements as total number of colors ({self.k})."
+
+        vertices_assigned = set()
+        for color_class in partition:
+            for vertex_number in color_class:
+                if vertex_number < 0 or vertex_number >= self.graph.vertex_number:
+                    return False, f"Each vertex must be in the range [0, {self.graph.vertex_number - 1}]."
+                elif vertex_number in vertices_assigned:
+                    return False, f"Each vertex must appear exactly once in partition representation. (found {vertex_number} multiple times)"
+                vertices_assigned.add(vertex_number)
+        if vertices_assigned != self.graph.vertices:
+            return False, f"All vertices must appear exactly once in partition representation."
+
+        return True, None
+
+    def create_partition_representation_from_assignment(self):
         self.partition: List[List[int]] = [[] for i in range(k)]
-        self.graph:Graph = graph
-
-        self.get_partition()
-
-    def get_partition(self):
         for color_index in range(self.k):
             self.partition[color_index] = (
                 np.where(np.array(self.assignment) == color_index)[0]
             ).tolist()
+
+        return
+
+    def create_assignment_representation_from_partition(self):
+        self.assignment: List[int] = [None] * self.graph.vertex_number
+        for color_code, color_class in enumerate(self.partition):
+            for vertex_number in color_class:
+                self.assignment[vertex_number] = color_code
+
+        return
+
+
+    def create_randomized_assignment(self):
+        self.assignment: List[int] = [random.randrange(self.k) for _ in range(self.graph.vertex_number)]
+
+
 
     def change_color(self, vertex, new_color):
         old_color = self.assignment[vertex]
@@ -229,7 +301,10 @@ if __name__ == "__main__":
     graph = Graph(filename=filename)
 
     initial_assignment = [random.randrange(k) for _ in range(graph.vertex_number)]
-    coloring = GraphColoring(k=k, assignment=initial_assignment)
+    coloring = GraphColoring(k=k, graph=graph, assignment=initial_assignment)
+    coloring2 = GraphColoring(k=k, graph=graph, assignment=initial_assignment)
+
+
 
     print("Initial random assignment:", coloring.assignment)
     print("Initial conflicts:", get_conflict_count(graph, coloring))
