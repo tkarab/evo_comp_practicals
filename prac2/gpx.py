@@ -42,7 +42,6 @@ def greedy_partition_crossover(parent1: GraphColoring, parent2: GraphColoring, d
     for v in remaining:
         child_partition[random.randrange(k)].add(v)
 
-    # Cast as List[List[int]] instead of List[set] for compatibility
     child_partition_as_lists = [sorted(color_class) for color_class in child_partition]
 
     return GraphColoring(graph=graph, k=k, partition=child_partition_as_lists)
