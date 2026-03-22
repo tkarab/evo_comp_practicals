@@ -1,6 +1,7 @@
 import os
-from typing import List
 import random
+from typing import List
+
 
 class Graph:
     def __init__(self, vertex_number=None, edges=None, filename=None):
@@ -16,21 +17,30 @@ class Graph:
 
     @staticmethod
     def _read_graph_data(filename: str):
-        path = os.path.join(os.getcwd(), "graph_data", filename)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base_dir, "graph_data", filename)
+
         edge_list = []
+        n = None
+
         with open(path) as f:
             for line in f:
                 if line.startswith("p "):
                     n = int(line.strip().split(" ")[-2])
                     edge_list = [[] for _ in range(n)]
                 elif line.startswith("e "):
-                    (i, j) = [int(x) for x in line.strip().replace("\\", "").split(" ")[-2:]]
+                    i, j = [int(x) for x in line.strip().replace("\\", "").split(" ")[-2:]]
                     edge_list[i - 1].append(j - 1)
                     edge_list[j - 1].append(i - 1)
+
+        if n is None:
+            raise ValueError(f"Could not parse graph file: {filename}")
+
         return n, edge_list
 
     def are_neighbors(self, i, j):
         return j in self.edges[i]
+
 
 class GraphColoring:
     def __init__(self, k: int, graph: Graph, assignment: List[int] = None, partition: List[List[int]] = None):
@@ -62,25 +72,30 @@ class GraphColoring:
 
     def _check_assignment(self, assignment):
         if len(assignment) != self.graph.vertex_number:
-            return False
+            return False, "Assignment length does not match number of vertices."
+
         for c in assignment:
             if c < 0 or c >= self.k:
-                return False
+                return False, "Assignment contains an invalid color."
+
         return True, None
 
     def _check_partition(self, partition):
         if len(partition) != self.k:
-            return False
+            return False, "Partition length does not match k."
+
         seen = set()
         for cls in partition:
             for v in cls:
                 if v < 0 or v >= self.graph.vertex_number:
-                    return False
+                    return False, "Partition contains an invalid vertex."
                 if v in seen:
-                    return False
+                    return False, "A vertex appears more than once in the partition."
                 seen.add(v)
+
         if seen != self.graph.vertices:
-            return False
+            return False, "Partition must cover all vertices exactly once."
+
         return True, None
 
     def _build_partition(self):
@@ -98,9 +113,11 @@ class GraphColoring:
         old_color = self.assignment[vertex]
         if old_color == new_color:
             return
+
         self.assignment[vertex] = new_color
         self.partition[old_color].remove(vertex)
         self.partition[new_color].append(vertex)
+
 
 def get_conflict_count(graph: Graph, coloring: GraphColoring) -> int:
     conflicts = 0
@@ -111,25 +128,26 @@ def get_conflict_count(graph: Graph, coloring: GraphColoring) -> int:
                 conflicts += 1
     return conflicts // 2
 
+
 def build_cost_matrix(graph: Graph, coloring: GraphColoring) -> List[List[int]]:
     k = coloring.k
     n = graph.vertex_number
     c = [[0] * k for _ in range(n)]
+
     for v in range(n):
         for nb in graph.edges[v]:
             c[v][coloring.assignment[nb]] += 1
+
     return c
+
 
 def vertex_descent(
     graph: Graph,
     coloring: GraphColoring,
     L: int,
 ) -> tuple:
-
-    k = coloring.k
     n = graph.vertex_number
 
-    # Build incremental cost matrix
     c = build_cost_matrix(graph, coloring)
 
     no_improve_count = 0
@@ -141,8 +159,7 @@ def vertex_descent(
 
         for v in vertices:
             old_color = coloring.assignment[v]
-            old_cost  = c[v][old_color]
-
+            old_cost = c[v][old_color]
             min_cost = min(c[v])
 
             if min_cost < old_cost:
@@ -169,20 +186,18 @@ def vertex_descent(
 
     return coloring, False
 
-# Convenience alias used by gls.py
 
 def vertex_descent_full_run(graph, coloring, L, debug=False):
-    """Alias for vertex_descent, kept for API compatibility with gls.py."""
     return vertex_descent(graph, coloring, L)
 
-# Quick test when run directly
 
 if __name__ == "__main__":
-    import sys, time
+    import sys
+    import time
 
     CONFIGS = {
-        "test":  ("debug10.col.doc",           3,  10),
-        "small": ("flat300_26_0.col.rtf.doc",  26, 100),
+        "test": ("debug10.col.doc", 3, 10),
+        "small": ("flat300_26_0.col.rtf.doc", 26, 100),
         "large": ("flat1000_76_0.col.rtf.doc", 83, 200),
     }
 
