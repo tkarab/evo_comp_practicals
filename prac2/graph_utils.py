@@ -151,13 +151,12 @@ def vertex_descent(
 ) -> tuple:
     n = graph.vertex_number
 
+    conflicts = get_conflict_count(graph, coloring)
     c = build_cost_matrix(graph, coloring)
 
     descent_cycles = 0
     vertices = list(range(n))
-    iteration_times = []
     while descent_cycles < L:
-        t1 = time.perf_counter()
 
         improved = False
         random.shuffle(vertices)
@@ -175,6 +174,8 @@ def vertex_descent(
                 coloring.partition[old_color].remove(v)
                 coloring.partition[new_color].append(v)
 
+                conflicts = conflicts - (old_cost - min_cost)
+
                 for nb in graph.edges[v]:
                     c[nb][old_color] -= 1
                     c[nb][new_color] += 1
@@ -182,11 +183,9 @@ def vertex_descent(
                 if min_cost < old_cost:
                     improved = True
 
-                if c[v][new_color] == 0 and get_conflict_count(graph, coloring) == 0:
+                if c[v][new_color] == 0 and conflicts == 0:
                     return coloring, True
-        t2  = time.perf_counter()
-        iteration_times.append(t2 - t1)
-        print(f"iteration time: {iteration_times[-1]:.4f}, mean:{np.mean(np.array(iteration_times)):.4f}")
+
         if improved:
             descent_cycles += 1
         else:
