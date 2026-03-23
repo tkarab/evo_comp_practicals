@@ -150,10 +150,10 @@ def vertex_descent(
 
     c = build_cost_matrix(graph, coloring)
 
-    no_improve_count = 0
+    descent_cycles = 0
     vertices = list(range(n))
 
-    while no_improve_count < L:
+    while descent_cycles < L:
         improved = False
         random.shuffle(vertices)
 
@@ -162,7 +162,7 @@ def vertex_descent(
             old_cost = c[v][old_color]
             min_cost = min(c[v])
 
-            if min_cost < old_cost:
+            if min_cost <= old_cost:
                 best = [color for color, cost in enumerate(c[v]) if cost == min_cost]
                 new_color = random.choice(best)
 
@@ -174,15 +174,16 @@ def vertex_descent(
                     c[nb][old_color] -= 1
                     c[nb][new_color] += 1
 
-                improved = True
+                if min_cost < old_cost:
+                    improved = True
 
                 if c[v][new_color] == 0 and get_conflict_count(graph, coloring) == 0:
                     return coloring, True
 
         if improved:
-            no_improve_count = 0
+            descent_cycles += 1
         else:
-            no_improve_count += 1
+            return coloring, False
 
     return coloring, False
 
@@ -197,7 +198,7 @@ if __name__ == "__main__":
 
     CONFIGS = {
         "test": ("debug10.col.doc", 3, 10),
-        "small": ("flat300_26_0.col.rtf.doc", 26, 100),
+        "small": ("flat300_26_0.col.rtf.doc", 28, 100),
         "large": ("flat1000_76_0.col.rtf.doc", 83, 200),
     }
 
