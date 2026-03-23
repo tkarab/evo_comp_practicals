@@ -1,6 +1,9 @@
 import os
 import random
 from typing import List
+import time
+
+import numpy as np
 
 
 class Graph:
@@ -152,8 +155,10 @@ def vertex_descent(
 
     descent_cycles = 0
     vertices = list(range(n))
-
+    iteration_times = []
     while descent_cycles < L:
+        t1 = time.perf_counter()
+
         improved = False
         random.shuffle(vertices)
 
@@ -179,7 +184,9 @@ def vertex_descent(
 
                 if c[v][new_color] == 0 and get_conflict_count(graph, coloring) == 0:
                     return coloring, True
-
+        t2  = time.perf_counter()
+        iteration_times.append(t2 - t1)
+        print(f"iteration time: {iteration_times[-1]:.4f}, mean:{np.mean(np.array(iteration_times)):.4f}")
         if improved:
             descent_cycles += 1
         else:
