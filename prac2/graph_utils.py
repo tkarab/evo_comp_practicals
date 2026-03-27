@@ -198,6 +198,66 @@ def vertex_descent_full_run(graph, coloring, L, debug=False):
     return vertex_descent(graph, coloring, L)
 
 
+def dsatur(graph:Graph, k:int):
+    n = graph.vertex_number
+
+    # initially empty cost matrix
+    c = [[0 for _ in range(k)] for _ in range(n)]
+
+    # Initialize assignment -> -1 == not assigned yet
+    assignment = [-1 for _ in range(n)]
+
+    # Allowed color classes =  number of '0' in cost matrix of vertex
+    allowed_color_classes_per_vertex = [color_counts.count(0) for color_counts in c]
+
+    # Minimum number of allowed classes in any (available) vertex (that are >0, and assignment of vertex is still -1) -> those with this number of allowed classes are the candidates
+    min_allowed_classes = min([classes for i,classes in enumerate(allowed_color_classes_per_vertex) if classes > 0 and assignment[i] == -1])
+
+    # Candidate vertices == those where # of allowed color classes == min_allowed_color_classes
+    candidate_vertices = [i for i in range(n) if allowed_color_classes_per_vertex[i] == min_allowed_classes and assignment[i] == -1]
+
+
+    # if not eve one vertex has a single allowed color class -> saturation
+    while len(candidate_vertices) > 0:
+
+        # Choose randomly
+        chosen_vertex = random.choice(candidate_vertices)
+        # color with lowest index from list of allowed ones (therefore all indices j where c[chosen_vertex][j] == 0) -> with .index(0_ you get the first appearence a.k.a. the allowed color with the lowest index
+        chosen_color = c[chosen_vertex].index(0)
+        # Assign coloring
+        assignment[chosen_vertex] = chosen_color
+        # Update neighbors in cos matrix
+        for neighbor in graph.edges[chosen_vertex]:
+            # Each Neighbor has one more adjacent vertex of color *chosen_color*
+            c[neighbor][chosen_color] += 1
+
+        # recalculate allowed classes per vertex and min allowed classes
+        allowed_color_classes_per_vertex = [color_counts.count(0) for color_counts in c]
+
+        if allowed_color_classes_per_vertex.count(0) == n:
+            print("print no vertex has any allowed color classes")
+
+        allowed_classes_for_non_assigned_vertices = [classes for i,classes in enumerate(allowed_color_classes_per_vertex) if classes > 0 and assignment[i] == -1]
+        min_allowed_classes = min(allowed_classes_for_non_assigned_vertices) if len(allowed_classes_for_non_assigned_vertices)>0 else -1
+        # Candidate vertices == those where # of allowed color classes == min_allowed_color_classes
+        candidate_vertices = [i for i in range(n) if allowed_color_classes_per_vertex[i] == min_allowed_classes and assignment[i] == -1]
+
+        if len(candidate_vertices) == 0:
+            print()
+
+
+    # Remaining vertices -> those that color is still '-1'
+    remaining_vertices = [i for i,vertex_color in enumerate(assignment) if vertex_color == -1]
+    for vertex in remaining_vertices:
+        # Assign color randomly
+        assignment[vertex] = random.randrange(k)
+
+    coloring = GraphColoring(graph=graph, k=k, assignment=assignment)
+
+    conflicts = get_conflict_count(graph, coloring)
+
+    return coloring
+
 if __name__ == "__main__":
     import sys
     import time
@@ -216,6 +276,8 @@ if __name__ == "__main__":
 
     coloring = GraphColoring(k=k, graph=graph)
     print(f"Initial conflicts: {get_conflict_count(graph, coloring)}")
+
+    dsatur(graph, coloring.k)
 
     t = time.time()
     coloring, solved = vertex_descent(graph, coloring, L=L)
