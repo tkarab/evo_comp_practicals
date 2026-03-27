@@ -254,7 +254,7 @@ if __name__ == "__main__":
         "large": ("flat1000_76_0.col.rtf.doc", 83, 200),
     }
 
-    name = sys.argv[1] if len(sys.argv) > 1 else "large"
+    name = sys.argv[1] if len(sys.argv) > 1 else "small"
     filename, k, L = CONFIGS[name]
 
     graph = Graph(filename=filename)
@@ -265,7 +265,6 @@ if __name__ == "__main__":
     coloring = dsatur_initialization(graph, k=k)
 
     print(f"Initial conflicts: {get_conflict_count(graph, coloring)}")
-
 
     t = time.time()
     coloring, solved = vertex_descent(graph, coloring, L=L)

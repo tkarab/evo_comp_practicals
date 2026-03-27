@@ -2,9 +2,10 @@ import csv
 import os
 import time
 import random
+import numpy as np
 from dataclasses import dataclass, field
 from gpx import greedy_partition_crossover
-from graph_utils import Graph, GraphColoring, get_conflict_count, vertex_descent
+from graph_utils import Graph, GraphColoring, get_conflict_count, vertex_descent, dsatur_initialization
 
 @dataclass
 class GLSResult:
@@ -34,14 +35,17 @@ def _init_population(graph, k, P, L, verbose=False):
         print(f"  Initialising population (P={P}, k={k}, L={L}) ...")
     population = []
     for _ in range(P):
-        coloring = GraphColoring(k=k, graph=graph)
+        # coloring = GraphColoring(k=k, graph=graph)
+        # Initialize using DSATUR
+        coloring = dsatur_initialization(graph=graph, k=k)
+
         coloring, solved = vertex_descent(graph, coloring, L)
         if solved:
             return [coloring], [0], True
         population.append(coloring)
     conflicts = [get_conflict_count(graph, c) for c in population]
     if verbose:
-        print(f"  Population ready. Best: {min(conflicts)}, Worst: {max(conflicts)}")
+        print(f"  Population ready. Best: {min(conflicts)}, Worst: {max(conflicts)}, Mean: {np.mean(conflicts)}")
     return population, conflicts, False
 
 def gls(
@@ -106,7 +110,8 @@ def gls(
         if verbose and crossovers % 500 == 0:
             print(
                 f"  [{crossovers} crossovers | {time.time()-t_start:.1f}s] "
-                f"global_best={global_best} current_best={current_best}"
+                f"global_best={global_best} current_best={current_best} "
+                f"population mean = {np.mean(conflicts):.2f}"
             )
 
     elapsed = time.time() - t_start
