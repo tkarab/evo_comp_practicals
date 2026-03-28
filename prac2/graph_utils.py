@@ -320,7 +320,12 @@ def tabu_search(
         conflicting_vertices = [i for i in range(n) if c[i][coloring.assignment[i]] > 0]
         iter+=1
 
-    return GraphColoring(graph=graph, k=k, assignment=best_assignment)
+    if best_conflicts == 0:
+        solved = True
+    else:
+        solved = False
+
+    return GraphColoring(graph=graph, k=k, assignment=best_assignment), solved
 
 
 
@@ -351,7 +356,7 @@ if __name__ == "__main__":
     import copy
     col_tabu = copy.deepcopy(coloring)
 
-    col_tabu, conflicts_tabu = tabu_search(graph, col_tabu, 500)
+    col_tabu, solved_tabu = tabu_search(graph, col_tabu, 500)
 
     print(f"Initial conflicts: {get_conflict_count(graph, coloring)}")
 

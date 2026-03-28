@@ -3,9 +3,10 @@ import os
 import time
 import random
 import numpy as np
+from typing import Literal
 from dataclasses import dataclass, field
 from gpx import greedy_partition_crossover
-from graph_utils import Graph, GraphColoring, get_conflict_count, vertex_descent, dsatur_initialization
+from graph_utils import Graph, GraphColoring, get_conflict_count, vertex_descent, dsatur_initialization, tabu_search
 
 @dataclass
 class GLSResult:
@@ -30,16 +31,21 @@ class RunStats:
     mean_best_conflicts: float
     results: list = field(repr=False, default_factory=list)
 
-def _init_population(graph, k, P, L, verbose=False):
+def _init_population(graph, k, P, L, verbose=False, ls_method_name: Literal["vertex_descent", "tabu"] = "vertex_descent"):
     if verbose:
         print(f"  Initialising population (P={P}, k={k}, L={L}) ...")
     population = []
+    if ls_method_name == "vertex_descent":
+        ls_method = vertex_descent
+    else:
+        ls_method = tabu_search
+
     for _ in range(P):
         # coloring = GraphColoring(k=k, graph=graph)
         # Initialize using DSATUR
         coloring = dsatur_initialization(graph=graph, k=k)
 
-        coloring, solved = vertex_descent(graph, coloring, L)
+        coloring, solved = ls_method(graph, coloring, L)
         if solved:
             return [coloring], [0], True
         population.append(coloring)
@@ -55,10 +61,15 @@ def gls(
     L: int,
     max_time: float,
     verbose: bool = False,
+    ls_method_name: Literal["vertex_descent", "tabu"] = "vertex_descent"
 ) -> GLSResult:
     t_start = time.time()
+    if ls_method_name == "vertex_descent":
+        ls_method = vertex_descent
+    else:
+        ls_method = tabu_search
 
-    population, conflicts, solved = _init_population(graph, k, P, L, verbose)
+    population, conflicts, solved = _init_population(graph, k, P, L, verbose, ls_method_name)
     if solved:
         elapsed = time.time() - t_start
         if verbose:
@@ -80,7 +91,7 @@ def gls(
         i, j = random.sample(range(P), 2)
         child = greedy_partition_crossover(population[i], population[j])
 
-        child, solved = vertex_descent(graph, child, L)
+        child, solved = ls_method(graph, child, L)
         crossovers += 1
         child_conflicts = get_conflict_count(graph, child)
 
@@ -135,7 +146,7 @@ def init_csv(filepath: str):
         with open(filepath, "w", newline="") as f:
             csv.writer(f).writerow(CSV_HEADER)
 
-def append_csv(filepath: str, result: GLSResult, run_index: int):
+def append_csv(filepath: str, result: GLSResult, run_index: int, ls_method: Literal["vertex_descent", "tabu"] = "vertex_descent"):
     with open(filepath, "a", newline="") as f:
         csv.writer(f).writerow(
             [
@@ -147,6 +158,7 @@ def append_csv(filepath: str, result: GLSResult, run_index: int):
                 result.best_conflicts,
                 result.crossovers,
                 f"{result.elapsed:.2f}",
+                ls_method,
             ]
         )
 
@@ -159,6 +171,7 @@ def run_experiment(
     n_runs: int = 10,
     csv_path: str = None,
     verbose: bool = False,
+    ls_method_name: Literal["vertex_descent", "tabu"] = "vertex_descent",
 ) -> RunStats:
     results = []
     for run in range(n_runs):
@@ -169,6 +182,7 @@ def run_experiment(
             L=L,
             max_time=max_time,
             verbose=verbose,
+            ls_method_name=ls_method_name
         )
         results.append(result)
 
@@ -179,7 +193,7 @@ def run_experiment(
         )
 
         if csv_path:
-            append_csv(csv_path, result, run + 1)
+            append_csv(csv_path, result, run + 1,ls_method_name)
 
     n_solved = sum(r.solved for r in results)
     solved_results = [r for r in results if r.solved]
@@ -214,6 +228,11 @@ if __name__ == "__main__":
     graph_small = Graph(filename="flat300_26_0.col.rtf.doc")
     graph_large = Graph(filename="flat1000_76_0.col.rtf.doc")
 
+    LSMethod = Literal["vertex_descent", "tabu"]
+    ls_method_name:LSMethod = "tabu"
+    # ls_method_name:LSMethod = "vertex_descent"
+
+
     CSV_2 = "results_task2_baseline.csv"
     CSV_3 = "results_task3_flat1000.csv"
     init_csv(CSV_2)
@@ -224,8 +243,14 @@ if __name__ == "__main__":
     print("=" * 60)
     print("TASK 2a — flat300, k=28, P=50, L=100  [15 min]")
     print("=" * 60)
-    result = gls(graph=graph_small, k=28, P=50, L=100, max_time=900, verbose=True)
-    append_csv(CSV_2, result, run_index=1)
+
+    if ls_method_name == "vertex_descent":
+        L = 100
+    else:
+        L = 500
+
+    result = gls(graph=graph_small, k=28, P=50, L=L, max_time=900, verbose=True, ls_method_name=ls_method_name)
+    append_csv(CSV_2, result, run_index=1, ls_method=ls_method_name)
     print(
         f"Result: solved={result.solved} | best_conflicts={result.best_conflicts} "
         f"| crossovers={result.crossovers} | elapsed={result.elapsed:.1f}s\n"
@@ -234,8 +259,14 @@ if __name__ == "__main__":
     print("=" * 60)
     print("TASK 2b — flat300, k=26, P=50, L=100  [15 min]")
     print("=" * 60)
-    result = gls(graph=graph_small, k=26, P=50, L=100, max_time=900, verbose=True)
-    append_csv(CSV_2, result, run_index=2)
+
+    if ls_method_name == "vertex_descent":
+        L = 100
+    else:
+        L = 500
+
+    result = gls(graph=graph_small, k=26, P=50, L=L, max_time=900, verbose=True, ls_method_name=ls_method_name)
+    append_csv(CSV_2, result, run_index=2, ls_method=ls_method_name)
     print(
         f"Result: solved={result.solved} | best_conflicts={result.best_conflicts} "
         f"| crossovers={result.crossovers} | elapsed={result.elapsed:.1f}s\n"
@@ -248,8 +279,14 @@ if __name__ == "__main__":
     print("=" * 60)
     print("TASK 3a — flat1000, k=100, P=100, L=200  [5 min]")
     print("=" * 60)
-    result = gls(graph=graph_large, k=100, P=100, L=200, max_time=300, verbose=True)
-    append_csv(CSV_3, result, run_index=1)
+
+    if ls_method_name == "vertex_descent":
+        L = 200
+    else:
+        L = 1000
+
+    result = gls(graph=graph_large, k=100, P=100, L=L, max_time=300, verbose=True, ls_method_name=ls_method_name)
+    append_csv(CSV_3, result, run_index=1, ls_method=ls_method_name)
     print(
         f"Result: solved={result.solved} | best_conflicts={result.best_conflicts} "
         f"| crossovers={result.crossovers} | elapsed={result.elapsed:.1f}s\n"
@@ -258,8 +295,13 @@ if __name__ == "__main__":
     print("=" * 60)
     print("TASK 3b — flat1000, k=83, P=100, L=200  [60 min]")
     print("=" * 60)
-    result = gls(graph=graph_large, k=83, P=100, L=200, max_time=3600, verbose=True)
-    append_csv(CSV_3, result, run_index=2)
+    if ls_method_name == "vertex_descent":
+        L = 200
+    else:
+        L = 1000
+
+    result = gls(graph=graph_large, k=83, P=100, L=L, max_time=3600, verbose=True, ls_method_name=ls_method_name)
+    append_csv(CSV_3, result, run_index=2, ls_method=ls_method_name)
     print(
         f"Result: solved={result.solved} | best_conflicts={result.best_conflicts} "
         f"| crossovers={result.crossovers} | elapsed={result.elapsed:.1f}s\n"
@@ -288,7 +330,7 @@ if __name__ == "__main__":
                 L=L,
                 max_time=180,
                 n_runs=10,
-                csv_path=CSV_41,
+                csv_path=CSV_41
             )
             print_stats(stats)
 
@@ -309,7 +351,7 @@ if __name__ == "__main__":
         L=100,
         max_time=300,
         n_runs=10,
-        csv_path=CSV_42,
+        csv_path=CSV_42
     )
     print_stats(stats)
     print(f"Results saved to {CSV_42}\n")
