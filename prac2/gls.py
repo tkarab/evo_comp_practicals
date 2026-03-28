@@ -139,7 +139,7 @@ def gls(
         L=L,
     )
 
-CSV_HEADER = ["k", "P", "L", "run", "solved", "best_conflicts", "crossovers", "elapsed"]
+CSV_HEADER = ["k", "P", "L", "run", "solved", "best_conflicts", "crossovers", "elapsed", "ls_method"]
 
 def init_csv(filepath: str):
     if not os.path.exists(filepath):
