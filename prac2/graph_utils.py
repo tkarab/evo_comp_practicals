@@ -2,6 +2,7 @@ import os
 import random
 from typing import List
 import time
+import math
 
 import numpy as np
 
@@ -205,27 +206,18 @@ def dsatur_initialization(graph: Graph, k: int, break_ties_by_degree: bool = Fal
     while True:
         allowed_counts = [row.count(0) for row in c]
 
-        unassigned_allowed_counts = [
-            count for v, count in enumerate(allowed_counts)
-            if assignment[v] == -1 and count > 0
-        ]
+        unassigned_allowed_counts = [count for v, count in enumerate(allowed_counts) if assignment[v] == -1 and count > 0]
 
         if not unassigned_allowed_counts:
             break
 
         min_allowed = min(unassigned_allowed_counts)
 
-        candidate_vertices = [
-            v for v in range(n)
-            if assignment[v] == -1 and allowed_counts[v] == min_allowed
-        ]
+        candidate_vertices = [v for v in range(n) if assignment[v] == -1 and allowed_counts[v] == min_allowed]
 
         if break_ties_by_degree:
             max_degree = max(len(graph.edges[v]) for v in candidate_vertices)
-            candidate_vertices = [
-                v for v in candidate_vertices
-                if len(graph.edges[v]) == max_degree
-            ]
+            candidate_vertices = [v for v in candidate_vertices if len(graph.edges[v]) == max_degree]
 
         chosen_vertex = random.choice(candidate_vertices)
         chosen_color = c[chosen_vertex].index(0)
@@ -242,6 +234,98 @@ def dsatur_initialization(graph: Graph, k: int, break_ties_by_degree: bool = Fal
     coloring = GraphColoring(graph=graph, k=k, assignment=assignment)
 
     return coloring
+
+def tabu_search(
+    graph: Graph,
+    coloring: GraphColoring,
+    max_iterations: int,
+    A:int = 10,
+    alpha: float = 0.6,
+):
+    n = graph.vertex_number
+    k=coloring.k
+    c = build_cost_matrix(graph, coloring)
+    current_conflicts = get_conflict_count(graph, coloring)
+    best_conflicts = current_conflicts
+    best_assignment = coloring.assignment.copy()
+
+    conflicting_vertices = [i for i in range(n) if c[i][coloring.assignment[i]] > 0]
+
+    iter = 0
+
+    tabu_moves = [[] for _ in range(n)]
+
+    while iter < max_iterations and current_conflicts > 0:
+        possible_moves = []
+        for v in conflicting_vertices:
+            current_color = coloring.assignment[v]
+            active_tabu_colors = [color for color, tenure in tabu_moves[v] if tenure >= iter]
+
+            allowed = []
+            for candidate in range(k):
+                if candidate == current_color:
+                    continue
+
+                candidate_conflicts = current_conflicts - (c[v][current_color] - c[v][candidate])
+                aspiration = candidate_conflicts < best_conflicts
+
+                if aspiration or candidate not in active_tabu_colors:
+                    allowed.append((candidate, candidate_conflicts))
+
+            if allowed:
+                best_vertex_cost = min(conf for _, conf in allowed)
+                best_candidates = [cand for cand, conf in allowed if conf == best_vertex_cost]
+
+                for candidate in best_candidates:
+                    possible_moves.append((v, current_color, candidate, best_vertex_cost))
+
+        if not possible_moves:
+            break
+
+        # Choose best move
+        best_cost = min(move[3] for move in possible_moves)
+        best_moves = [move for move in possible_moves if move[3] == best_cost]
+        best_move = random.choice(best_moves)
+
+        v = best_move[0]
+        old_color = best_move[1]
+        new_color = best_move[2]
+        new_conflicts = best_move[3]
+        current_conflicts = new_conflicts
+
+        # Apply new move
+        coloring.change_color(v, new_color)
+        for neighbor in graph.edges[v]:
+            c[neighbor][new_color] += 1
+            c[neighbor][old_color] -= 1
+
+        # Check for new best assignment
+        if current_conflicts < best_conflicts:
+            best_conflicts = current_conflicts
+            best_assignment = coloring.assignment.copy()
+
+        nbCFL = len(conflicting_vertices)
+        tl = random.randint(0, A - 1) + alpha * nbCFL
+        expire_iter = iter + math.ceil(tl)
+
+        # Add move to tabu moves
+        tabu_moves[v].append([old_color, expire_iter])
+
+        # Remove tabu moves past their expiration
+        for i in range(n):
+            tabu_moves[i] = [move for move in tabu_moves[i] if move[1] >= iter]
+
+
+        # recalculate conflicting vertices
+        conflicting_vertices = [i for i in range(n) if c[i][coloring.assignment[i]] > 0]
+        iter+=1
+
+    return GraphColoring(graph=graph, k=k, assignment=best_assignment)
+
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -263,6 +347,11 @@ if __name__ == "__main__":
     # coloring = GraphColoring(k=k, graph=graph)
     # Initiailize coloring using DSATUR
     coloring = dsatur_initialization(graph, k=k)
+
+    import copy
+    col_tabu = copy.deepcopy(coloring)
+
+    col_tabu, conflicts_tabu = tabu_search(graph, col_tabu, 500)
 
     print(f"Initial conflicts: {get_conflict_count(graph, coloring)}")
 
